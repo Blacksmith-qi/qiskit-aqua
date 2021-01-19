@@ -33,7 +33,7 @@ class DirectRotation(Reciprocal):
     def __init__(
             self,
             lambda_max: Optional[float] = None,
-            error: Optional[float] = 0.01,
+            error: Optional[float] = 0.001,
             max_amplitude: Optional[float] = 0.25) -> None:
         r"""
         Args:
@@ -68,7 +68,8 @@ class DirectRotation(Reciprocal):
         # Createing the circuit base
         self._ev = inreg
         self._anc = QuantumRegister(1, 'anc')
-        self._circuit = QuantumCircuit(inreg, self._anc) 
+        qc = QuantumCircuit(inreg, self._anc) 
+        self._circuit = qc
         self._reg_size = len(inreg)
 
         # Calculating the number of need repetitions for each bit in the
@@ -83,7 +84,15 @@ class DirectRotation(Reciprocal):
         n_repetitions = [int(ceil(n)) for n in n_repetitions]
                     
 
-
+        for bit in range(self._reg_size):
+            qc_temp = QuantumCircuit(1)
+            for i in range(n_repetitions[bit]):
+                angle = self._max_amplitude / n_repetitions[bit] / 2 ** bit
+                qc_temp.ry(angle, 0)
+                added_rotation_gate = qc_temp.to_gate(
+                                        label='rot bit ' + str(bit))
+                controlled_gate = added_rotation_gate.control()
+            self._circuit.append(controlled_gate, [self._ev[bit], self._anc])
 
 
 
