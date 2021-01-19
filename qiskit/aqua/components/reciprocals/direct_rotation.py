@@ -5,6 +5,7 @@ from typing import Optional
 import itertools
 import logging
 import numpy as np
+from math import ceil
 
 from qiskit import QuantumRegister, QuantumCircuit
 from qiskit.aqua.components.reciprocals import Reciprocal
@@ -32,6 +33,7 @@ class DirectRotation(Reciprocal):
     def __init__(
             self,
             lambda_max: Optional[float] = None,
+            error: Optional[float] = 0.01,
             max_amplitude: Optional[float] = 0.25) -> None:
         r"""
         Args:
@@ -41,8 +43,10 @@ class DirectRotation(Reciprocal):
         """
 
         super().__init__()
-        self.lambda_max = lambda_max
-        self.max_amplitude = max_amplitude
+        self._lambda_max = lambda_max
+        self._max_amplitude = max_amplitude
+        self._error = error
+        
 
 
     def sv_to_resvec(self, statevector, num_q):
@@ -60,12 +64,25 @@ class DirectRotation(Reciprocal):
          Raises:
             NotImplementedError: mode not supported
         """
-
+        
+        # Createing the circuit base
         self._ev = inreg
         self._anc = QuantumRegister(1, 'anc')
-        qc = QuantumCircuit(self._ev, self._anc)
-        self._circuit = qc
+        self._circuit = QuantumCircuit(inreg, self._anc) 
         self._reg_size = len(inreg)
+
+        # Calculating the number of need repetitions for each bit in the
+        # ev reg
+
+        n_repetitions = []
+        for bit in range(self._reg_size):
+            n_repetitions.append(
+                self._max_amplitude ** 2 /
+                        (self._error * 2 ** (2 * bit + 1)))
+        # convert to int
+        n_repetitions = [int(ceil(n)) for n in n_repetitions]
+                    
+
 
 
 
