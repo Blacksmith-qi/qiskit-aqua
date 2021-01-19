@@ -43,5 +43,6 @@ Reciprocals
 from .reciprocal import Reciprocal
 from .lookup_rotation import LookupRotation
 from .long_division import LongDivision
+from .direct_rotation import DirectRotation
 
-__all__ = ['LookupRotation', 'LongDivision', 'Reciprocal']
+__all__ = ['LookupRotation', 'LongDivision', 'Reciprocal', 'DirectRotation']
