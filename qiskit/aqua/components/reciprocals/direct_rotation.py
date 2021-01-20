@@ -50,7 +50,10 @@ class DirectRotation(Reciprocal):
 
 
     def sv_to_resvec(self, statevector, num_q):
-        return statevector
+        # Ignore ancilla qubit
+        half = int(len(statevector) / 2)
+        vec = statevector[half:half + 2 ** num_q]
+        return vec
 
     def construct_circuit(self, mode, inreg):
         """Construct the Direct Rotation circuit.
@@ -92,7 +95,9 @@ class DirectRotation(Reciprocal):
                 added_rotation_gate = qc_temp.to_gate(
                                         label='rot bit ' + str(bit))
                 controlled_gate = added_rotation_gate.control()
-            self._circuit.append(controlled_gate, [self._ev[bit], self._anc])
+            self._circuit.append(controlled_gate, 
+                            [self._ev[bit],
+                            self._anc])
 
 
 
