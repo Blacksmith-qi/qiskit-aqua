@@ -6,6 +6,9 @@ import logging
 import numpy as np
 
 from qiskit import QuantumRegister, ClassicalRegister, QuantumCircuit
+from qiskit.aqua import QuantumInstance
+from qiskit.providers import BaseBackend
+from qiskit.providers import Backend
 from qiskit.aqua.algorithms.linear_solvers import HHL
 from qiskit.ignis.verification.tomography import state_tomography_circuits, \
     StateTomographyFitter
