@@ -49,11 +49,15 @@ class DirectRotation(Reciprocal):
         
 
 
-    def sv_to_resvec(self, statevector, num_q):
-        # Ignore ancilla qubit
+    def sv_to_resvec(self, statevector, num_q, qdf=False):
         half = int(len(statevector) / 2)
-        vec = statevector[half:half + 2 ** num_q]
-        return vec
+        if not qdf:
+            # Ignore ancilla qubit
+            start_idx = half 
+        else:
+            # Ignore 2 ancilla qubits
+            start_idx = half + int(half/2)
+        return statevector[start_idx:start_idx + 2 ** num_q]
 
     def construct_circuit(self, mode, inreg):
         """Construct the Direct Rotation circuit.
@@ -70,7 +74,7 @@ class DirectRotation(Reciprocal):
         
         # Createing the circuit base
         self._ev = inreg
-        self._anc = QuantumRegister(1, 'anc')
+        self._anc = QuantumRegister(1, 'anc_direct')
         qc = QuantumCircuit(inreg, self._anc) 
         self._circuit = qc
         self._reg_size = len(inreg)
