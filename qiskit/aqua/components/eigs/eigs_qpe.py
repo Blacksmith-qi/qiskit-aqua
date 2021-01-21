@@ -105,7 +105,7 @@ class EigsQPE(Eigenvalues):
     def get_scaling(self):
         return self._evo_time
 
-    def construct_circuit(self, mode, register=None):
+    def construct_circuit(self, mode, register=None, a=None):
         """Construct the eigenvalues estimation using the PhaseEstimationCircuit
 
         Args:
@@ -127,8 +127,9 @@ class EigsQPE(Eigenvalues):
             expansion_mode=self._expansion_mode, expansion_order=self._expansion_order,
             evo_time=self._evo_time
         )
+        if a is None:
+            a = QuantumRegister(self._num_ancillae)
 
-        a = QuantumRegister(self._num_ancillae)
         q = register
 
         qc = pe.construct_circuit(state_register=q, ancillary_register=a)
