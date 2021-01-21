@@ -88,11 +88,11 @@ class QDF(HHL):
         """
 
         qc = super().construct_circuit(measurement=False)
-
         q = self._io_register
         a = self._eigenvalue_register
         s = self._ancilla_register
 
+        qc.barrier(a)
         # EigenvalueEstimation (QPE)
         qc += self._eigs2.construct_circuit("circuit", q, a)
         a = self._eigs2._output_register
@@ -104,6 +104,8 @@ class QDF(HHL):
         # Inverse EigenvalueEstimation
         qc += self._eigs2.construct_inverse("circuit", self._eigs._circuit)
 
+        return qc
+
     def _statevector_simulation(self) -> None:
         """The statevector simulation.
 
@@ -113,7 +115,7 @@ class QDF(HHL):
         res = self._quantum_instance.execute(self._circuit)
         sv = np.asarray(res.get_statevector(self._circuit))
         # Extract solution vector from statevector
-        vec = self._rotation.sv_to_resvec(sv, self._num_q)
+        vec = self._rotation.sv_to_resvec(sv, self._num_q, True)
         # remove added dimensions
         self._ret['probability_result'] = \
             np.real(self._resize_vector(vec).dot(self._resize_vector(vec).conj()))
@@ -122,7 +124,6 @@ class QDF(HHL):
 
 
 
-        return qc
 
 
 
