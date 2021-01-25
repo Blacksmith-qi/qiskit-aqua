@@ -49,14 +49,14 @@ class DirectRotation(Reciprocal):
         
 
 
-    def sv_to_resvec(self, statevector, num_q, qdf=False):
+    def sv_to_resvec(self, statevector, num_q, index_ancilla, qdf=False):
         half = int(len(statevector) / 2)
         if not qdf:
             # Ignore ancilla qubit
             start_idx = half 
         else:
             # Ignore 2 ancilla qubits
-            start_idx = half + int(half/2)
+            start_idx = half + 2 ** index_ancilla 
         return statevector[start_idx:start_idx + 2 ** num_q]
 
     def construct_circuit(self, mode, inreg):
