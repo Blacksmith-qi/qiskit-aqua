@@ -67,13 +67,13 @@ class QDF(HHL):
                         truncate_hermitian,
                         eigs,
                         init_state,
-                        reciprocal,
+                        rotation,
                         num_q,
                         num_a,
                         orig_size,
                         quantum_instance)
         self._eigs2 = eigs2
-        self._rotation = rotation
+        self._rotation_inverse = reciprocal
  
 
     def construct_circuit(self, measurement: bool = False) -> QuantumCircuit:
@@ -91,6 +91,7 @@ class QDF(HHL):
         q = self._io_register
         a = self._eigenvalue_register
         s = self._ancilla_register
+        self._ancilla_index = int(q.size + a.size)
 
         qc.barrier(a)
         # EigenvalueEstimation (QPE)
@@ -98,12 +99,13 @@ class QDF(HHL):
         a = self._eigs2._output_register
 
         # Reciprocal calculation with rotation
-        qc += self._rotation.construct_circuit("circuit", a)
-        s = self._rotation._anc
+        qc += self._rotation_inverse.construct_circuit("circuit", a)
 
         # Inverse EigenvalueEstimation
-        qc += self._eigs2.construct_inverse("circuit", self._eigs._circuit)
-
+        qc += self._eigs2.construct_inverse("circuit", self._eigs2._circuit)
+        
+        self._circuit = qc
+        
         return qc
 
     def _statevector_simulation(self) -> None:
@@ -115,7 +117,8 @@ class QDF(HHL):
         res = self._quantum_instance.execute(self._circuit)
         sv = np.asarray(res.get_statevector(self._circuit))
         # Extract solution vector from statevector
-        vec = self._rotation.sv_to_resvec(sv, self._num_q, True)
+        vec = self._reciprocal.sv_to_resvec(sv, self._num_q, 
+                                    self._ancilla_index, True)
         # remove added dimensions
         self._ret['probability_result'] = \
             np.real(self._resize_vector(vec).dot(self._resize_vector(vec).conj()))
