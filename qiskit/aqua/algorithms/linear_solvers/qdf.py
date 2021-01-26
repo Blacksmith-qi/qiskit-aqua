@@ -3,6 +3,7 @@
 
 from typing import Optional, Union, Dict, Any, Tuple
 import logging
+from copy import deepcopy
 import numpy as np
 
 from qiskit import QuantumRegister, ClassicalRegister, QuantumCircuit
@@ -124,6 +125,77 @@ class QDF(HHL):
             np.real(self._resize_vector(vec).dot(self._resize_vector(vec).conj()))
         vec = vec / np.linalg.norm(vec)
         self._hhl_results(vec)
+
+    def _state_tomography(self) -> None:
+        """The state tomography.
+
+        The QDF result gets extracted via state tomography. Available for
+        qasm simulator and real hardware backends.
+        """
+
+        # Preparing the state tomography circuits measuring the io register
+        tomo_circuits = state_tomography_circuits(self._circuit,
+                                                  self._io_register)
+        # Copy without measured ancillae, needed for the tomo fitter 
+        tomo_circuits_noanc = deepcopy(tomo_circuits)
+        # Adding measuremets to the ancillae
+        ca = ClassicalRegister(2)
+        for circ in tomo_circuits:
+            circ.add_register(ca)
+            circ.measure(self._reciprocal._anc, ca[0])
+            circ.measure(self._rotation_inverse._anc, ca[1])
+
+        # Extracting the probability of successful run
+        results = self._quantum_instance.execute(tomo_circuits)
+        probs = []
+        for circ in tomo_circuits:
+            counts = results.get_counts(circ)
+            s, f = 0, 0
+            for k, v in counts.items():
+                # Both ancillae in state 1
+                if k[0] == "1" and k[2] == "1":
+                    s += v
+                else:
+                    f += v
+            probs.append(s / (f + s))
+        probs = self._resize_vector(probs)
+        self._ret["probability_result"] = np.real(probs)
+
+        # Filtering the tomo data for valid results with ancillary measured
+        # to 1, i.e. c1==1 and c2==1
+        results_noanc = self._tomo_postselect(results)
+        tomo_data = StateTomographyFitter(results_noanc, tomo_circuits_noanc)
+        rho_fit = tomo_data.fit('lstsq')
+        vec = np.sqrt(np.diag(rho_fit))
+        self._hhl_results(vec)
+
+    def _tomo_postselect(self, results: Any) -> Any:
+        new_results = deepcopy(results)
+
+        for resultidx, _ in enumerate(results.results):
+            old_counts = results.get_counts(resultidx)
+            new_counts = {}
+
+            # change the size of the classical register
+            # Dropping the last two classical registers
+            new_results.results[resultidx].header.creg_sizes = [
+                new_results.results[resultidx].header.creg_sizes[0]]
+            new_results.results[resultidx].header.clbit_labels = \
+                new_results.results[resultidx].header.clbit_labels[0:-2]
+            new_results.results[resultidx].header.memory_slots = \
+                new_results.results[resultidx].header.memory_slots - 2
+
+            for reg_key in old_counts:
+                reg_bits = reg_key.split(' ')
+                # Both ancillae need to be in 1
+                if reg_bits[0] == '1' and reg_bits[2] == '1':
+                    new_counts[reg_bits[1]] = old_counts[reg_key]
+
+            data_counts = new_results.results[resultidx].data.counts
+            new_results.results[resultidx].data.counts = \
+                new_counts if isinstance(data_counts, dict) else data_counts.from_dict(new_counts)
+
+        return new_results
 
 
 
