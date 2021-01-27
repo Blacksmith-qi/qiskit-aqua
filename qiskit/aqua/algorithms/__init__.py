@@ -213,6 +213,7 @@ from .minimum_eigen_solvers import (VQE, VQEResult, QAOA, IQPE, IQPEResult, QPE,
                                     ClassicalCPLEX, CPLEX_Ising, NumPyMinimumEigensolver,
                                     MinimumEigensolver, MinimumEigensolverResult)
 from .education import EOH, Simon, DeutschJozsa, BernsteinVazirani
+from .swap_test import SwapTest
 
 __all__ = [
     'AlgorithmResult',
@@ -261,4 +262,5 @@ __all__ = [
     'HHL',
     'HHLResult',
     'Shor',
+    'SwapTest',
 ]

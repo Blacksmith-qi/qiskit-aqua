@@ -2,10 +2,18 @@
 Contains class to perform swap test
 """
 
-from typing import Optional
+from typing import Optional, Union, Dict, Any, Tuple
 from qiskit import QuantumRegister, ClassicalRegister
 from qiskit.aqua.algorithms.quantum_algorithm import QuantumAlgorithm
 from qiskit.circuit.quantumcircuit import QuantumCircuit
+from qiskit.result import Result
+
+from qiskit.providers import BaseBackend
+from qiskit.providers import Backend
+from qiskit.aqua import QuantumInstance
+
+
+
 
 class SwapTest(QuantumAlgorithm):
     """
@@ -15,15 +23,16 @@ class SwapTest(QuantumAlgorithm):
     def __init__(self,
                  qreg1: QuantumRegister,
                  qreg2: QuantumRegister,
-                 creg: Optional[ClassicalRegister] = None) -> None:
+                 quantum_instance: Optional[
+                    Union[QuantumInstance, BaseBackend, Backend]] = None) -> None:
+
         """
         Args:
             qreg1: First of the two registers to be swapped
             qreg2: Second of the two registers to be swapped
-            creg: Classical register to store the result of the test
         """
 
-        super().__init__()
+        super().__init__(quantum_instance)
 
         if qreg1.size is not qreg2.size:
             raise ValueError('Registers to swap have different size')
@@ -32,10 +41,6 @@ class SwapTest(QuantumAlgorithm):
         self.qreg2 = qreg2
         self.regsize = qreg1.size
         
-        if creg is not None:
-            self.creg = creg
-        else:
-            self.creg = ClassicalRegister(1)
     
 
     def construct_circuit(self) -> QuantumCircuit:
@@ -47,8 +52,7 @@ class SwapTest(QuantumAlgorithm):
             QuantumCircuit: object for the swap test circuit
         """
         
-        qc = QuantumCircuit(self.qreg1, self.qreg2, self.creg)
-
+        qc = QuantumCircuit(self.qreg1, self.qreg2)
         # Adding c-nots
         for idx in range(self.regsize):
             qc.cnot(self.qreg2[idx], self.qreg1[idx])
@@ -58,3 +62,6 @@ class SwapTest(QuantumAlgorithm):
 
         self.qc = qc
         return self.qc
+
+    def _run(self) -> Result:
+        return super()._run()
