@@ -21,6 +21,7 @@ class SwapTest(QuantumAlgorithm):
     """
 
     def __init__(self,
+                 start_circuit: QuantumCircuit,
                  qreg1: QuantumRegister,
                  qreg2: QuantumRegister,
                  quantum_instance: Optional[
@@ -28,8 +29,10 @@ class SwapTest(QuantumAlgorithm):
 
         """
         Args:
+            start_circuit: Circuit to append the swap test onto
             qreg1: First of the two registers to be swapped
             qreg2: Second of the two registers to be swapped
+            quantum_instance: Quantum Instance or Backend
         """
 
         super().__init__(quantum_instance)
@@ -37,9 +40,12 @@ class SwapTest(QuantumAlgorithm):
         if qreg1.size is not qreg2.size:
             raise ValueError('Registers to swap have different size')
 
-        self.qreg1 = qreg1
-        self.qreg2 = qreg2
-        self.regsize = qreg1.size
+        self._qreg1 = qreg1
+        self._qreg2 = qreg2
+        self._regsize = qreg1.size
+        self._start_circuit = start_circuit
+        self._circuit = None
+        self._results = None
         
     
 
@@ -52,16 +58,53 @@ class SwapTest(QuantumAlgorithm):
             QuantumCircuit: object for the swap test circuit
         """
         
-        qc = QuantumCircuit(self.qreg1, self.qreg2)
+        qc_0 = QuantumCircuit(self._qreg1, self._qreg2)
+
+        qc = qc_0 + self._start_circuit
+
         # Adding c-nots
-        for idx in range(self.regsize):
-            qc.cnot(self.qreg2[idx], self.qreg1[idx])
-            qc.h(self.qreg2[idx])
+        for idx in range(self._regsize):
+            qc.cnot(self._qreg2[idx], self._qreg1[idx])
+            qc.h(self._qreg2[idx])
 
         qc.measure_all()
 
-        self.qc = qc
-        return self.qc
+        self._circuit = qc
+        return qc
 
     def _run(self) -> Result:
-        return super()._run()
+        if self._quantum_instance.is_statevector:
+            raise TypeError('Statevector simulation not supported for swap test')
+        if self._circuit is None:
+            self.construct_circuit()
+
+        results = self._quantum_instance.execute(self._circuit)
+        
+        self._results = results
+
+        return results
+
+    def get_probaility(self) -> float:
+        if self._results is None:
+            self.run()
+
+        counts = self._results.get_counts()
+
+        # Starting post processing
+        runs_pos = 0
+        runs_neg = 0
+
+        for state, hits in counts.items():
+            number_11 = 0
+            for idx in range(self._regsize):
+                if state[idx] == '1' and state[idx + int(self._regsize)] == '1':
+                    number_11 += 1
+            print(state + '  ' + str(hits))
+            # If pairs of 00 or 11 is even -> equals 0 in clas ancilla
+            if number_11 % 2 == 0:
+                runs_neg += hits
+            else:
+                runs_pos += hits
+
+        prob = runs_pos / (runs_pos + runs_neg)
+        return prob
