@@ -24,6 +24,7 @@ class SwapTest(QuantumAlgorithm):
                  start_circuit: QuantumCircuit,
                  qreg1: QuantumRegister,
                  qreg2: QuantumRegister,
+                 error: Optional[float] = 0.01,
                  quantum_instance: Optional[
                     Union[QuantumInstance, BaseBackend, Backend]] = None) -> None:
 
@@ -32,6 +33,7 @@ class SwapTest(QuantumAlgorithm):
             start_circuit: Circuit to append the swap test onto
             qreg1: First of the two registers to be swapped
             qreg2: Second of the two registers to be swapped
+            error: Error tolerance for the result
             quantum_instance: Quantum Instance or Backend
         """
 
@@ -46,6 +48,7 @@ class SwapTest(QuantumAlgorithm):
         self._start_circuit = start_circuit
         self._circuit = None
         self._results = None
+        self._error = error
         
     
 
@@ -78,6 +81,8 @@ class SwapTest(QuantumAlgorithm):
         if self._circuit is None:
             self.construct_circuit()
 
+        # Change number of shots acording to error
+        self._quantum_instance._run_config.shots = int(1 / self._error**2 )
         results = self._quantum_instance.execute(self._circuit)
         
         self._results = results
