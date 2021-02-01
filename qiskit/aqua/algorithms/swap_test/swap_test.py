@@ -12,6 +12,8 @@ from qiskit.providers import BaseBackend
 from qiskit.providers import Backend
 from qiskit.aqua import QuantumInstance
 
+import numpy as np
+
 
 
 
@@ -104,7 +106,7 @@ class SwapTest(QuantumAlgorithm):
             for idx in range(self._regsize):
                 if state[idx] == '1' and state[idx + int(self._regsize)] == '1':
                     number_11 += 1
-            print(state + '  ' + str(hits))
+            # DEBUG print(state + '  ' + str(hits))
             # If pairs of 00 or 11 is even -> equals 0 in clas ancilla
             if number_11 % 2 == 0:
                 runs_neg += hits
@@ -112,4 +114,8 @@ class SwapTest(QuantumAlgorithm):
                 runs_pos += hits
 
         prob = runs_pos / (runs_pos + runs_neg)
-        return prob
+        error = 2 * (1 - np.sqrt(abs(1-2 * prob)))
+        difference = abs(1-2 * prob)
+        result = {'probability' : prob, 'error' : error, 
+                    'difference' : difference}
+        return result
