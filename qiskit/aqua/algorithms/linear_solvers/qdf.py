@@ -41,7 +41,7 @@ class QDF(HHL):
             rotation: Optional[Reciprocal] = None,
             num_q: int = 0,
             num_a: int = 0,
-            orig_size: Optional[int] = None,
+            orig_size: Optional[Tuple[int, int]] = None,
             quantum_instance: Optional[
                 Union[QuantumInstance, BaseBackend, Backend]] = None) -> None:
         """
@@ -57,7 +57,7 @@ class QDF(HHL):
             rotation: The eigenvalue direct controlled rotation
             num_q: Number of qubits required for the matrix Operator instance
             num_a: Number of ancillary qubits for Eigenvalues instance
-            orig_size: The original dimension of the problem (if truncate_powerdim)
+            orig_size: Orignal size of the matrix before resizing
             quantum_instance: Quantum Instance or Backend
         Raises:
             ValueError: Invalid input
@@ -71,11 +71,115 @@ class QDF(HHL):
                         rotation,
                         num_q,
                         num_a,
-                        orig_size,
+                        orig_size[1],
                         quantum_instance)
         self._eigs2 = eigs2
         self._rotation_inverse = reciprocal
+        self._orig_rows = orig_size[0]
+        self._orig_columns = orig_size[1]
  
+
+    @staticmethod
+    def matrix_resize(matrix: np.ndarray,
+                      vector: np.ndarray) -> Tuple[np.ndarray, np.ndarray, bool, bool]:
+        """Resizes matrix if necessary
+
+        Args:
+            matrix: the input matrix of linear system of equations
+            vector: the input vector of linear system of equations
+        Returns:
+            new matrix, vector, truncate_powerdim, truncate_hermitian
+        Raises:
+            ValueError: invalid input
+        """
+        if not isinstance(matrix, np.ndarray):
+            matrix = np.asarray(matrix)
+        if not isinstance(vector, np.ndarray):
+            vector = np.asarray(vector)
+
+        if matrix.shape[0] != len(vector):
+            raise ValueError("Input vector dimension does not match input "
+                             "matrix dimension!")
+
+        truncate_powerdim = False
+        truncate_hermitian = False
+        orig_size = None
+        if orig_size is None:
+            orig_size = len(vector)
+        
+        is_hermitian = np.allclose(matrix, matrix.conj().T)
+        if not is_hermitian:
+            logger.warning("Input matrix is not hermitian. It will be "
+                           "expanded to a hermitian matrix automatically.")
+            # Use resizing from paper
+            matrix, vector = QDF.expand_to_hermitian(matrix, vector)
+            truncate_hermitian = True
+
+
+        is_powerdim = np.log2(matrix.shape[0]) % 1 == 0
+        if not is_powerdim:
+            logger.warning("Input matrix does not have dimension 2**n. It "
+                           "will be expanded automatically.")
+            matrix, vector = HHL.expand_to_powerdim(matrix, vector)
+            truncate_powerdim = True
+
+        # Return hermitian konjugate to get later I(F.H) and A = I(F.H)^2 
+        return matrix, vector, truncate_powerdim, truncate_hermitian
+
+    @staticmethod
+    def expand_to_hermitian(matrix: np.ndarray,
+                            vector: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """ Expand a non-hermitian matrix A to a hermitian matrix by
+        [[0, A], [A.H, 0]] and expand vector b to [0,b].
+
+        Args:
+            matrix: the input matrix
+            vector: the input vector
+
+        Returns:
+            the expanded matrix, the expanded vector
+        """
+        #
+        rows = matrix.shape[0]
+        columns = matrix.shape[1]
+        new_matrix_right = np.zeros([rows, rows])
+        new_matrix_right = np.array(new_matrix_right, dtype=complex)
+        
+        new_matrix_left = np.zeros([columns, columns])
+        new_matrix_left = np.array(new_matrix_left, dtype=complex)
+
+        # concatenating to one matrix
+
+        top_matrix = np.concatenate((new_matrix_left, matrix.conj().T), axis=1)
+        bottom_matrix = np.concatenate((matrix, new_matrix_right), axis=1)
+
+        matrix = np.concatenate((top_matrix, bottom_matrix))
+
+        new_vector = np.zeros((1, rows + columns))
+        new_vector = np.array(new_vector, dtype=complex)
+        new_vector[0, columns:] = vector
+        vector = new_vector.reshape(np.shape(new_vector)[1])
+        return matrix, vector
+
+    def _resize_vector(self, vec: np.ndarray) -> np.ndarray:
+        if self._truncate_hermitian or self._truncate_powerdim:
+            vec = vec[:self._orig_columns] #Take first M entries
+        return vec
+    
+    def _resize_matrix(self, matrix: np.ndarray) -> np.ndarray:
+        if self._truncate_hermitian or self._truncate_powerdim:
+            M = self._orig_columns #Columns
+            N = self._orig_rows# Rows
+            matrix = matrix[M : M+N, 0:M]
+        return matrix
+    
+    def _resize_in_vector(self, vec: np.ndarray) -> np.ndarray:
+        if self._truncate_hermitian or self._truncate_powerdim:
+            vec = vec[-self._orig_rows:] #Take first N entries
+        return vec
+    
+
+
 
     def construct_circuit(self, measurement: bool = False) -> QuantumCircuit:
         """Construct the QDF circuit.
@@ -197,6 +301,17 @@ class QDF(HHL):
 
         return new_results
 
+    def _hhl_results(self, vec: np.ndarray) -> None:
+        res_vec = self._resize_vector(vec)
+        in_vec = self._resize_in_vector(self._vector)
+        matrix = self._resize_matrix(self._matrix)
+        self._ret["output"] = res_vec
+        # Rescaling the output vector to the real solution vector
+        tmp_vec = matrix.dot(res_vec)
+        f1 = np.linalg.norm(in_vec) / np.linalg.norm(tmp_vec)
+        # "-1+1" to fix angle error for -0.-0.j
+        f2 = sum(np.angle(in_vec * tmp_vec.conj() - 1 + 1)) 
+        self._ret["solution"] = f1 * res_vec * np.exp(-1j * f2)
 
 
 
