@@ -34,7 +34,7 @@ class DirectRotation(Reciprocal):
             self,
             lambda_max: Optional[float] = None,
             error: Optional[float] = 0.001,
-            max_amplitude: Optional[float] = 0.25) -> None:
+            max_amplitude: Optional[float] = 0.8) -> None:
         r"""
         Args:
             lambda_max: The biggest expected eigenvalue
