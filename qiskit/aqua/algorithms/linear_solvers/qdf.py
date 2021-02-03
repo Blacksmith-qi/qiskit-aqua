@@ -167,15 +167,28 @@ class QDF(HHL):
         return vec
     
     def _resize_matrix(self, matrix: np.ndarray) -> np.ndarray:
-        if self._truncate_hermitian or self._truncate_powerdim:
-            M = self._orig_columns #Columns
-            N = self._orig_rows# Rows
+        M = self._orig_columns #Columns
+        N = self._orig_rows# Rows
+        if self._truncate_powerdim:
+            if self._truncate_hermitian:
+                matrix = matrix[: M + N,: M + N]
+            else:
+                matrix = matrix[: N, :M]
+        
+        if self._truncate_hermitian:
             matrix = matrix[M : M+N, 0:M]
         return matrix
     
     def _resize_in_vector(self, vec: np.ndarray) -> np.ndarray:
-        if self._truncate_hermitian or self._truncate_powerdim:
-            vec = vec[-self._orig_rows:] #Take first N entries
+        M = self._orig_columns #Columns
+        N = self._orig_rows# Rows
+        if self._truncate_powerdim:
+            if self._truncate_hermitian:
+                vec = vec[: N + M]
+            else:
+                vec = vec[: N]
+        if self._truncate_hermitian:
+            vec = vec[-self._orig_rows:] #Take last N entries
         return vec
     
 
@@ -306,6 +319,7 @@ class QDF(HHL):
         in_vec = self._resize_in_vector(self._vector)
         matrix = self._resize_matrix(self._matrix)
         self._ret["output"] = res_vec
+        self._in_vector = in_vec
         # Rescaling the output vector to the real solution vector
         tmp_vec = matrix.dot(res_vec)
         f1 = np.linalg.norm(in_vec) / np.linalg.norm(tmp_vec)
