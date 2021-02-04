@@ -3,19 +3,27 @@
 
 from typing import Optional, Union, Dict, Any, Tuple
 import logging
-from copy import deepcopy
+from copy import Error, deepcopy
 import numpy as np
+from collections import Counter
+from numpy.core.records import array
 
 from qiskit import QuantumRegister, ClassicalRegister, QuantumCircuit
+
 from qiskit.aqua import QuantumInstance
+from qiskit.aqua.components.eigs.eigs_qpe import EigsQPE
 from qiskit.providers import BaseBackend
 from qiskit.providers import Backend
 from qiskit.aqua.algorithms.linear_solvers import HHL
 from qiskit.ignis.verification.tomography import state_tomography_circuits, \
     StateTomographyFitter
-from qiskit.aqua.components.initial_states import InitialState
+from qiskit.aqua.components.initial_states import InitialState, Custom
 from qiskit.aqua.components.reciprocals import Reciprocal
 from qiskit.aqua.components.eigs import Eigenvalues
+from qiskit.aqua.operators import MatrixOperator
+
+from qiskit.circuit.library import QFT
+
 from .linear_solver_result import LinearsolverResult
 
 logger = logging.getLogger(__name__)
@@ -77,6 +85,8 @@ class QDF(HHL):
         self._rotation_inverse = reciprocal
         self._orig_rows = orig_size[0]
         self._orig_columns = orig_size[1]
+        self._matrix_old = None
+        self._vector_old = None
  
 
     @staticmethod
@@ -106,6 +116,14 @@ class QDF(HHL):
         orig_size = None
         if orig_size is None:
             orig_size = len(vector)
+
+        # Prevent Problems with 1x1 matrices
+        if matrix.shape[0] == 1 and matrix.shape[1] == 1:
+            logger.warning("Input matrix is only 1x1 It will be "
+                           "expanded to a hermitian matrix automatically.")
+            # Use resizing from paper
+            matrix, vector = QDF.expand_to_hermitian(matrix, vector)
+            truncate_hermitian = True
         
         is_hermitian = np.allclose(matrix, matrix.conj().T)
         if not is_hermitian:
@@ -161,6 +179,68 @@ class QDF(HHL):
         vector = new_vector.reshape(np.shape(new_vector)[1])
         return matrix, vector
 
+    @staticmethod
+    def preparation(
+        matrix: np.ndarray,
+        vector: np.ndarray,
+        num_ancillae: int,
+        evo_time: Optional[tuple[float,float]] = [None, None],
+        num_time_slices: Optional[int] = 50,
+        expansion_mode: Optional[str] = 'suzuki',
+        expansion_order: Optional[int] = 2) -> Tuple:
+        """
+        Prepares everything for the algorithm.
+        - Manges expanding matrix depending on hermitan or powerdim.
+        - Creates Instances of the eigenvalue circuits
+
+        Args:
+            matrix: The input matrix of linear system of equations
+            vector: The input vector of linear system of equations
+            num_ancillae: The number of ancillary qubits to use for the measurement,
+            evo_time: An optional evolution time which should scale the eigenvalue onto the range
+                :math:`(0,1]` (or :math:`(-0.5,0.5]` for negative eigenvalues). Defaults to
+                ``None`` in which case a suitably estimated evolution time is internally computed.
+            num_time_slices: The number of time slices, has a minimum value of 1.
+            expansion_mode: The expansion mode ('trotter' | 'suzuki')
+            expansion_order: The suzuki expansion order, has a minimum value of 1.
+
+        Returns:
+            matrix: The input matrix of linear system of equations
+            vector: The input vector of linear system of equations
+            truncate_powerdim: Flag indicating expansion to 2**n matrix to be truncated
+            truncate_hermitian: Flag indicating expansion to hermitian matrix to be truncated
+            eigs: The eigenvalue estimation instance
+            eigs2: The eigenvalue estimation instance for matrix^2
+            num_q: Number of qubits required for the matrix Operator instance
+            num_a: Number of ancillary qubits for Eigenvalues instance
+            orig_size: Orignal size of the matrix before resizing
+ 
+        """
+        orig_size = matrix.shape
+        matrix, vector, truncate_powerdim, truncate_hermitian = \
+            QDF.matrix_resize(matrix, vector)
+
+        # Create Eigenvalue instaces
+        eigs = EigsQPE(MatrixOperator(matrix),
+                        QFT(num_ancillae, inverse=True),
+                        num_time_slices = num_time_slices,
+                        expansion_mode=expansion_mode,
+                        num_ancillae = num_ancillae,
+                        expansion_order=expansion_order,
+                        evo_time=evo_time[0])
+        eigs2 = EigsQPE(MatrixOperator(matrix @ matrix),
+                        QFT(num_ancillae, inverse=True),
+                        num_time_slices = num_time_slices,
+                        expansion_mode=expansion_mode,
+                        num_ancillae = num_ancillae,
+                        expansion_order=expansion_order,
+                        evo_time=evo_time[1])
+        num_q, num_a = eigs.get_register_sizes()
+
+        result = matrix, vector, truncate_powerdim, truncate_hermitian, \
+                eigs, eigs2, num_q, num_a, orig_size
+        return result
+
     def _resize_vector(self, vec: np.ndarray) -> np.ndarray:
         if self._truncate_hermitian or self._truncate_powerdim:
             vec = vec[:self._orig_columns] #Take first M entries
@@ -194,12 +274,15 @@ class QDF(HHL):
 
 
 
-    def construct_circuit(self, measurement: bool = False) -> QuantumCircuit:
+    def construct_circuit(self, 
+                        measurement: bool = False,
+                        measure_result: bool = False) -> QuantumCircuit:
         """Construct the QDF circuit.
 
         Args:
             measurement: indicate whether measurement on both ancillary qubits
                 should be performed
+            measure_result: result register is also measured
 
         Returns:
             the QuantumCircuit object for the constructed circuit
@@ -222,8 +305,23 @@ class QDF(HHL):
         # Inverse EigenvalueEstimation
         qc += self._eigs2.construct_inverse("circuit", self._eigs2._circuit)
         
-        self._circuit = qc
+
+        # Measuring the ancilla qubits
+        if measurement:
+            c = ClassicalRegister(2, name='result_anc')
+            qc.add_register(c)
+            qc.measure(self._reciprocal._anc, c[0])
+            qc.measure(self._rotation_inverse._anc, c[1])
+            self._success_bit = c
+
+        # Measureing the result register
+        if measure_result:
+            c = ClassicalRegister(self._io_register._size, name='result')
+            qc.add_register(c)
+            qc.measure(self._io_register, c)
         
+        self._circuit = qc
+
         return qc
 
     def _statevector_simulation(self) -> None:
@@ -327,7 +425,110 @@ class QDF(HHL):
         f2 = sum(np.angle(in_vec * tmp_vec.conj() - 1 + 1)) 
         self._ret["solution"] = f1 * res_vec * np.exp(-1j * f2)
 
+    @staticmethod
+    def _filter_results(counts):
+        """
+        Returns all mesurements with both ancilla qubit in 11.
+        Ancilla qubits need to be first measurement e.g. '0101 11'
+
+        Args:
+            counts: Counts of a run on a real device or qasm simulator
+
+        Returns:
+            counts_filterd: all counts with ancillae in '11'
+        """
+        new_counts = {}
+        for key, value in counts.items():
+            # Both ancilla need to be in 1
+            if key[-1] == "1" and key[-2] == "1":
+                new_counts[key[:-3]] = value
+        return new_counts
 
 
+        
 
+    def reduce_fitfunctions(self, num_fit_func: int, 
+                            factor: Optional[float] = 2,
+                            new_evo_time: Optional[Tuple[float, float]] =
+                                [None, None]) -> None:
+        """
+        Start of part 3 of the paper.
+        Samples Algrithm O(num_fit_func) times and create histogram.
+        Choose the most important num_fit_funtions and reduce dimension
+        of matrix to the needed fit functions
+
+        Args:
+            num_fit_func: Number M' of the most important fit functions
+            factor: Factor by which num_fit_func is multiplied to get 
+                    number of runs
+        
+        Returns:
+            nothing but modifys used matrix
+        """
+
+    
+
+        if self._quantum_instance.is_statevector:
+            raise Error("Quantum instance needs to be a real device or qasm simulator")
+        else:
+            self.construct_circuit(measurement=True, measure_result=True)
+
+
+        number_of_runs = num_fit_func * factor
+
+        self._quantum_instance._run_config.shots = number_of_runs 
+        result = self._quantum_instance.execute(self._circuit)
+
+        counts = result.get_counts(self._circuit)
+        counts = QDF._filter_results(counts)
+
+        # Selecting most important fit functions
+        idx_keep_dim = []
+        for idx in range(num_fit_func):
+            # Get highes count key
+            key = max(counts, key = counts.get)
+            del counts[key]
+            # Only keep dim if it is not a additional dim from
+            # truncation
+            dim = int(key,2)
+            if dim < self._orig_columns:
+                idx_keep_dim.append(dim)
+
+
+        self._matrix_old = self._matrix
+        self._vector_old = self._vector
+
+        # Resize the matrix
+        new_matrix = self._resize_matrix(self._matrix)
+        new_vector = self._resize_in_vector(self._vector)
+
+
+        new_matrix = new_matrix[:,idx_keep_dim]
+        self._keep_dim = idx_keep_dim
+
+        self._matrix_new = new_matrix
+        self._vector_new = new_vector
+
+        # Initailize with new matrix
+        matrix, vector, truncate_powerdim, truncate_hermitian, \
+            eigs, eigs2, num_q, num_a, orig_size = \
+                QDF.preparation(new_matrix,
+                                new_vector,
+                                self._num_a)
+
+        self._matrix = matrix
+        self._vector = vector
+        self._truncate_hermitian = truncate_hermitian
+        self._truncate_powerdim = truncate_powerdim
+        self._eigs = eigs
+        self._eigs2 = eigs2
+        self._num_q = num_q
+        self._orig_rows = orig_size[0]
+        self._orig_columns = orig_size[1]
+        self._init_state = Custom(num_q, state_vector=vector)
+
+
+       
+
+            
 
