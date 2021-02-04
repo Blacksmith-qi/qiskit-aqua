@@ -84,6 +84,8 @@ class EigsQPE(Eigenvalues):
         # estimate evolution time
         if self._evo_time is None:
             lmax = sum([abs(p[0]) for p in self._operator.paulis])
+            if lmax == 0:
+                lmax = 1
             if not self._negative_evals:
                 self._evo_time = (1 - 2 ** -self._num_ancillae) * 2 * np.pi / lmax
             else:
