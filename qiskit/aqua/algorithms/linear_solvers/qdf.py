@@ -50,6 +50,7 @@ class QDF(HHL):
             num_q: int = 0,
             num_a: int = 0,
             orig_size: Optional[Tuple[int, int]] = None,
+            mprime: Optional[int] = 2,
             quantum_instance: Optional[
                 Union[QuantumInstance, BaseBackend, Backend]] = None) -> None:
         """
@@ -66,6 +67,7 @@ class QDF(HHL):
             num_q: Number of qubits required for the matrix Operator instance
             num_a: Number of ancillary qubits for Eigenvalues instance
             orig_size: Orignal size of the matrix before resizing
+            mprime: Reduced numer of fit functions according to paper
             quantum_instance: Quantum Instance or Backend
         Raises:
             ValueError: Invalid input
@@ -87,6 +89,7 @@ class QDF(HHL):
         self._orig_columns = orig_size[1]
         self._matrix_old = None
         self._vector_old = None
+        self._mprime = mprime
  
 
     @staticmethod
@@ -447,7 +450,7 @@ class QDF(HHL):
 
         
 
-    def reduce_fitfunctions(self, num_fit_func: int, 
+    def reduce_fitfunctions(self, num_fit_func: Optional[int] = None, 
                             factor: Optional[float] = 2,
                             new_evo_time: Optional[Tuple[float, float]] =
                                 [None, None]) -> None:
@@ -466,6 +469,9 @@ class QDF(HHL):
             nothing but modifys used matrix
         """
 
+        if num_fit_func is None:
+            # Use mprime from functino init
+            num_fit_func = self._mprime
     
 
         if self._quantum_instance.is_statevector:
