@@ -23,19 +23,23 @@ class SwapTest(QuantumAlgorithm):
     """
 
     def __init__(self,
-                 start_circuit: QuantumCircuit,
+                 start_circuit1: QuantumCircuit,
+                 start_circuit2: QuantumCircuit,
                  qreg1: QuantumRegister,
                  qreg2: QuantumRegister,
                  error: Optional[float] = 0.01,
+                 factor: Optional[float] = 1,
                  quantum_instance: Optional[
                     Union[QuantumInstance, BaseBackend, Backend]] = None) -> None:
 
         """
         Args:
-            start_circuit: Circuit to append the swap test onto
+            start_circuit1: First circuit to produce outcome
+            start_circuit2: Second circuit to produce outcome
             qreg1: First of the two registers to be swapped
             qreg2: Second of the two registers to be swapped
             error: Error tolerance for the result
+            factor: Factor the number of runs get muliplied
             quantum_instance: Quantum Instance or Backend
         """
 
@@ -47,10 +51,12 @@ class SwapTest(QuantumAlgorithm):
         self._qreg1 = qreg1
         self._qreg2 = qreg2
         self._regsize = qreg1.size
-        self._start_circuit = start_circuit
+        self._start_circuit1 = start_circuit1
+        self._start_circuit2 = start_circuit2
         self._circuit = None
         self._results = None
         self._error = error
+        self._factor = factor
         
     
 
@@ -63,16 +69,21 @@ class SwapTest(QuantumAlgorithm):
             QuantumCircuit: object for the swap test circuit
         """
         
-        qc_0 = QuantumCircuit(self._qreg1, self._qreg2)
 
-        qc = qc_0 + self._start_circuit
+        qc = self._start_circuit1 + self._start_circuit2
+        c_reg = ClassicalRegister(2*self._regsize, name='res')
+        qc.add_register(c_reg)
+
+        qc.barrier()
 
         # Adding c-nots
         for idx in range(self._regsize):
             qc.cnot(self._qreg2[idx], self._qreg1[idx])
             qc.h(self._qreg2[idx])
 
-        qc.measure_all()
+        qc.barrier()
+        qc.measure(self._qreg1, c_reg[0:self._regsize])
+        qc.measure(self._qreg2, c_reg[self._regsize:])
 
         self._circuit = qc
         return qc
@@ -84,7 +95,8 @@ class SwapTest(QuantumAlgorithm):
             self.construct_circuit()
 
         # Change number of shots acording to error
-        self._quantum_instance._run_config.shots = int(1 / self._error**2 )
+        number_of_shots = self._factor *  int(1 / self._error**2 )
+        self._quantum_instance._run_config.shots = number_of_shots
         results = self._quantum_instance.execute(self._circuit)
         
         self._results = results
