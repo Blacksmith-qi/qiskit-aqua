@@ -10,7 +10,7 @@ from qiskit.result import Result
 
 from qiskit.providers import BaseBackend
 from qiskit.providers import Backend
-from qiskit.aqua import QuantumInstance
+from qiskit.aqua import QuantumInstance, algorithms
 
 import numpy as np
 
@@ -96,6 +96,7 @@ class SwapTest(QuantumAlgorithm):
 
         # Change number of shots acording to error
         number_of_shots = self._factor *  int(1 / self._error**2 )
+        print(f'Running {number_of_shots} times')
         self._quantum_instance._run_config.shots = number_of_shots
         results = self._quantum_instance.execute(self._circuit)
         
@@ -103,11 +104,15 @@ class SwapTest(QuantumAlgorithm):
 
         return results
 
-    def get_probaility(self) -> float:
+    def get_probaility(self, qdf: Optional[bool] = False) -> float:
         if self._results is None:
             self.run()
 
         counts = self._results.get_counts()
+
+        # Postselect counts with ancillae in 11
+        if qdf == True:
+            counts = algorithms.linear_solvers.QDF._filter_results(counts)
 
         # Starting post processing
         runs_pos = 0
@@ -129,5 +134,5 @@ class SwapTest(QuantumAlgorithm):
         error = 2 * (1 - np.sqrt(abs(1-2 * prob)))
         difference = abs(1-2 * prob)
         result = {'probability' : prob, 'error' : error, 
-                    'difference' : difference}
+                    'scalar_product' : difference}
         return result
