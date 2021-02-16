@@ -111,8 +111,8 @@ class QDF(HHL):
             vector = np.asarray(vector)
 
         if matrix.shape[0] != len(vector):
-            raise ValueError("Input vector dimension does not match input "
-                             "matrix dimension!")
+            raise ValueError(f"Input vector dimension {len(vector)} does not match input "
+                             f"matrix dimension {matrix.shape[0]}!")
 
         truncate_powerdim = False
         truncate_hermitian = False
@@ -187,6 +187,7 @@ class QDF(HHL):
         matrix: np.ndarray,
         vector: np.ndarray,
         num_ancillae: int,
+        swap_test: Optional[bool] = False,
         evo_time: Optional[tuple[float,float]] = [None, None],
         num_time_slices: Optional[int] = 50,
         expansion_mode: Optional[str] = 'suzuki',
@@ -195,10 +196,13 @@ class QDF(HHL):
         Prepares everything for the algorithm.
         - Manges expanding matrix depending on hermitan or powerdim.
         - Creates Instances of the eigenvalue circuits
+        - Returns as second matrix A noramlly and I(F) if one wants to 
+            perform the swap test
 
         Args:
             matrix: The input matrix of linear system of equations
             vector: The input vector of linear system of equations
+            swap_test: Information if swap test will be used
             num_ancillae: The number of ancillary qubits to use for the measurement,
             evo_time: An optional evolution time which should scale the eigenvalue onto the range
                 :math:`(0,1]` (or :math:`(-0.5,0.5]` for negative eigenvalues). Defaults to
@@ -220,27 +224,46 @@ class QDF(HHL):
  
         """
         orig_size = matrix.shape
-        matrix, vector, truncate_powerdim, truncate_hermitian = \
+        matrix_F_dagger, vector, truncate_powerdim, truncate_hermitian = \
             QDF.matrix_resize(matrix, vector)
 
         # Create Eigenvalue instaces
-        eigs = EigsQPE(MatrixOperator(matrix),
+        eigs = EigsQPE(MatrixOperator(matrix_F_dagger),
                         QFT(num_ancillae, inverse=True),
                         num_time_slices = num_time_slices,
                         expansion_mode=expansion_mode,
                         num_ancillae = num_ancillae,
                         expansion_order=expansion_order,
                         evo_time=evo_time[0])
-        eigs2 = EigsQPE(MatrixOperator(matrix @ matrix),
+        if swap_test:
+
+            # Create I(F) using existing function
+
+            matrix_F, *unused = QDF.matrix_resize(matrix.conjugate().T,
+                                        np.zeros([matrix.shape[1]]))
+
+            print(matrix_F)
+            eigs2 = EigsQPE(MatrixOperator(matrix_F),
+                        QFT(num_ancillae, inverse=True),
+                        num_time_slices = num_time_slices,
+                        expansion_mode=expansion_mode,
+                        num_ancillae = num_ancillae,
+                        expansion_order=expansion_order,
+                        evo_time=evo_time[0])
+            matrix_2 = matrix_F
+
+        else:
+            eigs2 = EigsQPE(MatrixOperator(matrix_F_dagger @ matrix_F_dagger),
                         QFT(num_ancillae, inverse=True),
                         num_time_slices = num_time_slices,
                         expansion_mode=expansion_mode,
                         num_ancillae = num_ancillae,
                         expansion_order=expansion_order,
                         evo_time=evo_time[1])
+            matrix_2 = matrix_F_dagger @ matrix_F_dagger
         num_q, num_a = eigs.get_register_sizes()
 
-        result = matrix, vector, truncate_powerdim, truncate_hermitian, \
+        result = matrix_F_dagger,matrix_2, vector, truncate_powerdim, truncate_hermitian, \
                 eigs, eigs2, num_q, num_a, orig_size
         return result
 
