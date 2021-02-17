@@ -5,7 +5,7 @@ from typing import Optional
 import itertools
 import logging
 import numpy as np
-from math import ceil
+from math import ceil, isclose
 
 from qiskit import QuantumRegister, QuantumCircuit
 from qiskit.aqua.components.reciprocals import Reciprocal
@@ -33,18 +33,15 @@ class DirectRotation(Reciprocal):
     def __init__(
             self,
             lambda_max: Optional[float] = None,
-            error: Optional[float] = 0.001,
-            max_amplitude: Optional[float] = 0.8) -> None:
+            error: Optional[float] = 0.001) -> None:
         r"""
         Args:
             lambda_max: The biggest expected eigenvalue
-            max_amplitude: The wanted scale of the resulting amplitude of the
-            biggest eigenvalue will be
+            error: Max error E = |angle - sind(angle)|
         """
 
         super().__init__()
         self._lambda_max = lambda_max
-        self._max_amplitude = max_amplitude
         self._error = error
         
 
@@ -79,26 +76,23 @@ class DirectRotation(Reciprocal):
         self._circuit = qc
         self._reg_size = len(inreg)
 
-        # Calculating the number of need repetitions for each bit in the
-        # ev reg
 
-        n_repetitions = []
-        for bit in range(self._reg_size):
-            n_repetitions.append(
-                self._max_amplitude ** 2 /
-                        (self._error * 2 ** (2 * bit + 1)))
-        # convert to int
-        n_repetitions = [int(ceil(n)) for n in n_repetitions]
-                    
+        # calculate angle to achive desired error
+        max_angle = np.pi
+        while(not isclose(max_angle, np.sin(max_angle), rel_tol=self._error)):
+            max_angle = max_angle/2
+
+        print(f"angle {max_angle} is used")
+
 
         for bit in range(self._reg_size):
             qc_temp = QuantumCircuit(1)
-            for i in range(n_repetitions[bit]):
-                angle = self._max_amplitude / n_repetitions[bit] / 2 ** bit
-                qc_temp.ry(angle, 0)
-                added_rotation_gate = qc_temp.to_gate(
+            angle = 2 * max_angle  / 2 ** bit
+            print(angle)
+            qc_temp.ry(angle, 0)
+            added_rotation_gate = qc_temp.to_gate(
                                         label='rot bit ' + str(bit))
-                controlled_gate = added_rotation_gate.control()
+            controlled_gate = added_rotation_gate.control()
             self._circuit.append(controlled_gate, 
                             [self._ev[bit],
                             self._anc])
