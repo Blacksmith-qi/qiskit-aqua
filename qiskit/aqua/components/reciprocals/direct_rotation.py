@@ -82,13 +82,11 @@ class DirectRotation(Reciprocal):
         while(not isclose(max_angle, np.sin(max_angle), rel_tol=self._error)):
             max_angle = max_angle/2
 
-        print(f"angle {max_angle} is used")
 
 
         for bit in range(self._reg_size):
             qc_temp = QuantumCircuit(1)
             angle = 2 * max_angle  / 2 ** bit
-            print(angle)
             qc_temp.ry(angle, 0)
             added_rotation_gate = qc_temp.to_gate(
                                         label='rot bit ' + str(bit))
