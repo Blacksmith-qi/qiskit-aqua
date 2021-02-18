@@ -394,7 +394,7 @@ class QDF(HHL):
             s, f = 0, 0
             for k, v in counts.items():
                 # Both ancillae in state 1
-                if k[0] == "1" and k[2] == "1":
+                if k[0] == "1" and k[1] == "1":
                     s += v
                 else:
                     f += v
@@ -429,7 +429,7 @@ class QDF(HHL):
             for reg_key in old_counts:
                 reg_bits = reg_key.split(' ')
                 # Both ancillae need to be in 1
-                if reg_bits[0] == '1' and reg_bits[2] == '1':
+                if reg_bits[0] == '11':
                     new_counts[reg_bits[1]] = old_counts[reg_key]
 
             data_counts = new_results.results[resultidx].data.counts
@@ -539,7 +539,7 @@ class QDF(HHL):
         self._vector_new = new_vector
 
         # Initailize with new matrix
-        matrix, vector, truncate_powerdim, truncate_hermitian, \
+        matrix, matrix2, vector, truncate_powerdim, truncate_hermitian, \
             eigs, eigs2, num_q, num_a, orig_size = \
                 QDF.preparation(new_matrix,
                                 new_vector,
