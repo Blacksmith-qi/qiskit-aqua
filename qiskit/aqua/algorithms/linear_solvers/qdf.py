@@ -190,6 +190,7 @@ class QDF(HHL):
         swap_test: Optional[bool] = False,
         evo_time: Optional[tuple[float,float]] = [None, None],
         num_time_slices: Optional[int] = 50,
+        negative_evals: Optional[bool] = False,
         expansion_mode: Optional[str] = 'suzuki',
         expansion_order: Optional[int] = 2) -> Tuple:
         """
@@ -208,6 +209,7 @@ class QDF(HHL):
                 :math:`(0,1]` (or :math:`(-0.5,0.5]` for negative eigenvalues). Defaults to
                 ``None`` in which case a suitably estimated evolution time is internally computed.
             num_time_slices: The number of time slices, has a minimum value of 1.
+            negative_evals: If negative eigenvalues should be taken into account
             expansion_mode: The expansion mode ('trotter' | 'suzuki')
             expansion_order: The suzuki expansion order, has a minimum value of 1.
 
@@ -227,6 +229,14 @@ class QDF(HHL):
         matrix_F_dagger, vector, truncate_powerdim, truncate_hermitian = \
             QDF.matrix_resize(matrix, vector)
 
+        # Additional ancilla qubit to keep accuracy
+        ne_qfts = [None, None]
+        if negative_evals:
+            num_ancillae += 1
+            ne_qfts = [QFT(num_ancillae - 1), QFT(num_ancillae - 1).inverse()]
+            evo_time = [time / 2 for time in evo_time]
+
+
         # Create Eigenvalue instaces
         eigs = EigsQPE(MatrixOperator(matrix_F_dagger),
                         QFT(num_ancillae, inverse=True),
@@ -234,7 +244,9 @@ class QDF(HHL):
                         expansion_mode=expansion_mode,
                         num_ancillae = num_ancillae,
                         expansion_order=expansion_order,
-                        evo_time=evo_time[0])
+                        negative_evals=negative_evals,
+                        evo_time=evo_time[0],
+                        ne_qfts=ne_qfts)
         if swap_test:
 
             # Create I(F) using existing function
@@ -249,7 +261,9 @@ class QDF(HHL):
                         expansion_mode=expansion_mode,
                         num_ancillae = num_ancillae,
                         expansion_order=expansion_order,
-                        evo_time=evo_time[0])
+                        negative_evals=negative_evals,
+                        evo_time=evo_time[0],
+                        ne_qfts=ne_qfts)
             matrix_2 = matrix_F
 
         else:
@@ -259,7 +273,9 @@ class QDF(HHL):
                         expansion_mode=expansion_mode,
                         num_ancillae = num_ancillae,
                         expansion_order=expansion_order,
-                        evo_time=evo_time[1])
+                        negative_evals=negative_evals,
+                        evo_time=evo_time[1],
+                        ne_qfts=ne_qfts)
             matrix_2 = matrix_F_dagger @ matrix_F_dagger
         num_q, num_a = eigs.get_register_sizes()
 

@@ -32,10 +32,12 @@ class DirectRotation(Reciprocal):
 
     def __init__(
             self,
+            negative_evals: Optional[bool] = False,
             lambda_max: Optional[float] = None,
             error: Optional[float] = 0.001) -> None:
         r"""
         Args:
+            negative_evals: If ancillae contain a negative value
             lambda_max: The biggest expected eigenvalue
             error: Max error E = |angle - sind(angle)|
         """
@@ -43,6 +45,7 @@ class DirectRotation(Reciprocal):
         super().__init__()
         self._lambda_max = lambda_max
         self._error = error
+        self._negative_evals = negative_evals
         
 
 
@@ -82,9 +85,14 @@ class DirectRotation(Reciprocal):
         while(not isclose(max_angle, np.sin(max_angle), rel_tol=self._error)):
             max_angle = max_angle/2
 
+        start_bit = 0
+        # For neagtive evals first qubit contains sign
+        if self._negative_evals is True:
+            # Ignore first qubit
+            start_bit = 1
+            max_angle *= 2
 
-
-        for bit in range(self._reg_size):
+        for bit in range(start_bit, self._reg_size):
             qc_temp = QuantumCircuit(1)
             angle = 2 * max_angle  / 2 ** bit
             qc_temp.ry(angle, 0)
@@ -95,6 +103,9 @@ class DirectRotation(Reciprocal):
                             [self._ev[bit],
                             self._anc])
 
+        if self._negative_evals is True:
+            # -1  factor
+            self._circuit.cz(self._ev[0],self._anc)
 
 
         return self._circuit
