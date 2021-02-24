@@ -149,25 +149,5 @@ class EigsQPE(Eigenvalues):
         sgn = q[0]
         qs = [q[i] for i in range(1, len(q))]
 
-        def apply_ne_qft(ne_qft):
-            if isinstance(ne_qft, QuantumCircuit):
-                # check if QFT has the right size
-                if ne_qft.num_qubits != len(qs):
-                    try:  # try resizing
-                        ne_qft.num_qubits = len(qs)
-                    except AttributeError as ex:
-                        raise ValueError('The IQFT cannot be resized and does not have the '
-                                         'required size of {}'.format(len(qs))) from ex
-
-                if hasattr(ne_qft, 'do_swaps'):
-                    ne_qft.do_swaps = False
-                qc.append(ne_qft.to_instruction(), qs)
-            else:
-                ne_qft.construct_circuit(mode='circuit', qubits=qs, circuit=qc, do_swaps=False)
-
-        for qi in qs:
-            qc.cx(sgn, qi)
-        apply_ne_qft(self._ne_qfts[0])
-        for i, qi in enumerate(reversed(qs)):
-            qc.cp(2 * np.pi / 2 ** (i + 1), sgn, qi)
-        apply_ne_qft(self._ne_qfts[1])
+        for q_idx in range(len(q) - 1, 1, -1):
+            qc.ccx(sgn, q[q_idx], q[q_idx -1])
