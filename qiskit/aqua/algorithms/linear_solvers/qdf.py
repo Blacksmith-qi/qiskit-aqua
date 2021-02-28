@@ -12,6 +12,7 @@ from qiskit import QuantumRegister, ClassicalRegister, QuantumCircuit
 
 from qiskit.aqua import QuantumInstance
 from qiskit.aqua.components.eigs.eigs_qpe import EigsQPE
+from qiskit.quantum_info import DensityMatrix
 from qiskit.providers import BaseBackend
 from qiskit.providers import Backend
 from qiskit.aqua.algorithms.linear_solvers import HHL
@@ -422,8 +423,8 @@ class QDF(HHL):
         # to 1, i.e. c1==1 and c2==1
         results_noanc = self._tomo_postselect(results)
         tomo_data = StateTomographyFitter(results_noanc, tomo_circuits_noanc)
-        rho_fit = tomo_data.fit('lstsq')
-        vec = np.sqrt(np.diag(rho_fit))
+        rho_fit = tomo_data.fit('cvx')
+        vec = DensityMatrix(rho_fit).to_statevector(atol=0.1)
         self._hhl_results(vec)
 
     def _tomo_postselect(self, results: Any) -> Any:
