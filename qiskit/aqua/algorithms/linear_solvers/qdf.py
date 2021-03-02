@@ -425,7 +425,7 @@ class QDF(HHL):
         tomo_data = StateTomographyFitter(results_noanc, tomo_circuits_noanc)
         rho_fit = tomo_data.fit('cvx')
         vec = DensityMatrix(rho_fit).to_statevector(atol=0.1)
-        self._hhl_results(vec)
+        self._hhl_results(vec.data)
 
     def _tomo_postselect(self, results: Any) -> Any:
         new_results = deepcopy(results)
