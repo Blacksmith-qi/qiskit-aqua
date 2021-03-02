@@ -40,5 +40,6 @@ Eigenvalues
 
 from .eigs import Eigenvalues
 from .eigs_qpe import EigsQPE
+from .bb_eigs import BBEigs
 
-__all__ = ['EigsQPE', 'Eigenvalues']
+__all__ = ['EigsQPE', 'Eigenvalues', 'BBEigs']

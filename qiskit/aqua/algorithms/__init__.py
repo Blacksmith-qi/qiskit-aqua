@@ -206,9 +206,9 @@ from .classifiers import VQC, QSVM, SklearnSVM, SVM_Classical
 from .distribution_learners import QGAN
 from .eigen_solvers import NumPyEigensolver, ExactEigensolver, Eigensolver, EigensolverResult
 from .factorizers import Shor
-from .linear_solvers import (LinearsolverResult, HHL,
-                             HHLResult, NumPyLSsolver,
-                             NumPyLSsolverResult, ExactLSsolver)
+#from .linear_solvers import (LinearsolverResult, HHL, QDF,
+#                             HHLResult, NumPyLSsolver,
+#                             NumPyLSsolverResult, ExactLSsolver)
 from .minimum_eigen_solvers import (VQE, VQEResult, QAOA, IQPE, IQPEResult, QPE, QPEResult,
                                     ClassicalCPLEX, CPLEX_Ising, NumPyMinimumEigensolver,
                                     MinimumEigensolver, MinimumEigensolverResult)
