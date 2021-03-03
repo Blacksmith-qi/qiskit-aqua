@@ -251,33 +251,25 @@ class QDF(HHL):
         if swap_test:
 
             # Create I(F) using existing function
-
-            matrix_F, *unused = QDF.matrix_resize(matrix.conjugate().T,
+            matrix_2, *unused = QDF.matrix_resize(matrix.conjugate().T,
                                         np.zeros([matrix.shape[1]]))
-
-            print(matrix_F)
-            eigs2 = EigsQPE(MatrixOperator(matrix_F),
-                        QFT(num_ancillae, inverse=True),
-                        num_time_slices = num_time_slices,
-                        expansion_mode=expansion_mode,
-                        num_ancillae = num_ancillae,
-                        expansion_order=expansion_order,
-                        negative_evals=negative_evals,
-                        evo_time=evo_time[0],
-                        ne_qfts=ne_qfts)
-            matrix_2 = matrix_F
-
+            evo_time_2 = evo_time[0]
         else:
-            eigs2 = EigsQPE(MatrixOperator(matrix_F_dagger @ matrix_F_dagger),
+            matrix_2 = matrix_F_dagger @ matrix_F_dagger
+            evo_time_2 = evo_time[1]
+
+
+        eigs2 = EigsQPE(MatrixOperator(matrix_2),
                         QFT(num_ancillae, inverse=True),
                         num_time_slices = num_time_slices,
                         expansion_mode=expansion_mode,
                         num_ancillae = num_ancillae,
                         expansion_order=expansion_order,
                         negative_evals=negative_evals,
-                        evo_time=evo_time[1],
+                        evo_time=evo_time_2,
                         ne_qfts=ne_qfts)
-            matrix_2 = matrix_F_dagger @ matrix_F_dagger
+
+
         num_q, num_a = eigs.get_register_sizes()
 
         result = matrix_F_dagger,matrix_2, vector, truncate_powerdim, truncate_hermitian, \
