@@ -39,6 +39,10 @@ class BBEigs(Eigenvalues):
         self._num_ancillae = num_ancillae
         self._negative_evals = negative_evals
         self._num_q = int(np.log2(np.shape(matrix)[0]))
+        self._output_register = None
+        self._circuit = None
+        self._input_register = None
+
 
     def get_register_sizes(self):
         return self._num_q, self._num_ancillae
@@ -108,7 +112,18 @@ class BBEigs(Eigenvalues):
         state = Custom(num_qubits=self._num_ancillae,
                         state_vector=state_vec)
 
-        circuit = QuantumCircuit(a)
+        if a is None:
+            output_reg = QuantumRegister(self._num_ancillae)
+            circuit = QuantumCircuit(output_reg)
+        else:
+            output_reg = a
+            circuit = QuantumCircuit(a)
+
         circuit += state.construct_circuit(register=a)
+
+
+        self._output_register = output_reg
+        self._circuit = circuit
+        self._input_register = register
 
         return circuit 

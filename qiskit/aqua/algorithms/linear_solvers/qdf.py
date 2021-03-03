@@ -12,6 +12,7 @@ from qiskit import QuantumRegister, ClassicalRegister, QuantumCircuit
 
 from qiskit.aqua import QuantumInstance
 from qiskit.aqua.components.eigs.eigs_qpe import EigsQPE
+from qiskit.aqua.components.eigs.bb_eigs import BBEigs
 from qiskit.quantum_info import DensityMatrix
 from qiskit.providers import BaseBackend
 from qiskit.providers import Backend
@@ -91,6 +92,7 @@ class QDF(HHL):
         self._matrix_old = None
         self._vector_old = None
         self._mprime = mprime
+        self._idx_keep_dim = None
  
 
     @staticmethod
@@ -193,7 +195,8 @@ class QDF(HHL):
         num_time_slices: Optional[int] = 50,
         negative_evals: Optional[bool] = False,
         expansion_mode: Optional[str] = 'suzuki',
-        expansion_order: Optional[int] = 2) -> Tuple:
+        expansion_order: Optional[int] = 2,
+        blackbox: Optional[bool] = False) -> Tuple:
         """
         Prepares everything for the algorithm.
         - Manges expanding matrix depending on hermitan or powerdim.
@@ -213,6 +216,8 @@ class QDF(HHL):
             negative_evals: If negative eigenvalues should be taken into account
             expansion_mode: The expansion mode ('trotter' | 'suzuki')
             expansion_order: The suzuki expansion order, has a minimum value of 1.
+            blackbox: If set the eigenvalues are calculated classical and 
+                provided using a blackbox
 
         Returns:
             matrix: The input matrix of linear system of equations
@@ -234,29 +239,30 @@ class QDF(HHL):
         ne_qfts = [None, None]
         if negative_evals:
             num_ancillae += 1
+            # Following line no longer needed
             ne_qfts = [QFT(num_ancillae - 1), QFT(num_ancillae - 1).inverse()]
-            evo_time = [time / 2 for time in evo_time]
+            if evo_time[0] is not None:
+                evo_time = [time / 2 for time in evo_time]
 
 
-        # Create Eigenvalue instaces
-        eigs = EigsQPE(MatrixOperator(matrix_F_dagger),
-                        QFT(num_ancillae, inverse=True),
-                        num_time_slices = num_time_slices,
-                        expansion_mode=expansion_mode,
-                        num_ancillae = num_ancillae,
-                        expansion_order=expansion_order,
-                        negative_evals=negative_evals,
-                        evo_time=evo_time[0],
-                        ne_qfts=ne_qfts)
+            
         if swap_test:
 
             # Create I(F) using existing function
 
-            matrix_F, *unused = QDF.matrix_resize(matrix.conjugate().T,
+            matrix_2, *unused = QDF.matrix_resize(matrix.conjugate().T,
                                         np.zeros([matrix.shape[1]]))
 
-            print(matrix_F)
-            eigs2 = EigsQPE(MatrixOperator(matrix_F),
+            evo_time_2 = evo_time[0]
+
+        else: # no swap test
+            matrix_2 = matrix_F_dagger @ matrix_F_dagger
+            # Use bigger evo_time as eigenvalue will be squared
+            evo_time_2 = evo_time[1]
+
+        # Create Eigenvalue instaces
+        if not blackbox:
+            eigs = EigsQPE(MatrixOperator(matrix_F_dagger),
                         QFT(num_ancillae, inverse=True),
                         num_time_slices = num_time_slices,
                         expansion_mode=expansion_mode,
@@ -265,24 +271,32 @@ class QDF(HHL):
                         negative_evals=negative_evals,
                         evo_time=evo_time[0],
                         ne_qfts=ne_qfts)
-            matrix_2 = matrix_F
 
-        else:
-            eigs2 = EigsQPE(MatrixOperator(matrix_F_dagger @ matrix_F_dagger),
+            eigs2 = EigsQPE(MatrixOperator(matrix_2),
                         QFT(num_ancillae, inverse=True),
                         num_time_slices = num_time_slices,
                         expansion_mode=expansion_mode,
                         num_ancillae = num_ancillae,
                         expansion_order=expansion_order,
                         negative_evals=negative_evals,
-                        evo_time=evo_time[1],
+                        evo_time=evo_time_2,
                         ne_qfts=ne_qfts)
-            matrix_2 = matrix_F_dagger @ matrix_F_dagger
+        else:
+            eigs = BBEigs(matrix=matrix_F_dagger,
+                        num_ancillae=num_ancillae,
+                        negative_evals=negative_evals)
+            eigs2 = BBEigs(matrix=matrix_2,
+                        num_ancillae=num_ancillae,
+                        negative_evals=negative_evals)
+
+
+
         num_q, num_a = eigs.get_register_sizes()
 
         result = matrix_F_dagger,matrix_2, vector, truncate_powerdim, truncate_hermitian, \
                 eigs, eigs2, num_q, num_a, orig_size
         return result
+
 
     def _resize_vector(self, vec: np.ndarray) -> np.ndarray:
         if self._truncate_hermitian or self._truncate_powerdim:
@@ -481,16 +495,16 @@ class QDF(HHL):
                 else:
                     res_old.append(0)
 
-        res_vec = np.array(res_old)
-        in_vec = self._vector_old
+            res_vec = np.array(res_old)
+            in_vec = self._vector_old
         
-        # Rescaling the output vector to the real solution vector
-        tmp_vec = self._matrix_old.dot(res_vec)
-        f1 = np.linalg.norm(in_vec) / np.linalg.norm(tmp_vec)
-        # "-1+1" to fix angle error for -0.-0.j
-        f2 = sum(np.angle(in_vec * tmp_vec.conj() - 1 + 1)) 
-        solution_rec = f1 * res_vec * np.exp(-1j * f2)
-        self._ret["solution_old"] = solution_rec
+            # Rescaling the output vector to the real solution vector
+            tmp_vec = self._matrix_old.dot(res_vec)
+            f1 = np.linalg.norm(in_vec) / np.linalg.norm(tmp_vec)
+            # "-1+1" to fix angle error for -0.-0.j
+            f2 = sum(np.angle(in_vec * tmp_vec.conj() - 1 + 1)) 
+            solution_rec = f1 * res_vec * np.exp(-1j * f2)
+            self._ret["solution_old"] = solution_rec
 
 
     @staticmethod
