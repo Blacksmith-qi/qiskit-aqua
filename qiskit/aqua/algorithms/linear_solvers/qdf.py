@@ -130,7 +130,11 @@ class QDF(HHL):
             matrix, vector = QDF.expand_to_hermitian(matrix, vector)
             truncate_hermitian = True
         
-        is_hermitian = np.allclose(matrix, matrix.conj().T)
+        if matrix.shape[0] != matrix.shape[1]:
+            # matrix is not square
+            is_hermitian = False
+        else: 
+            is_hermitian = np.allclose(matrix, matrix.conj().T)
         if not is_hermitian:
             logger.warning("Input matrix is not hermitian. It will be "
                            "expanded to a hermitian matrix automatically.")
