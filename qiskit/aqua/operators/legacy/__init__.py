@@ -55,7 +55,8 @@ Legacy Operator support
 """
 from .common import (evolution_instruction, suzuki_expansion_slice_pauli_list, pauli_measurement,
                      measure_pauli_z, covariance, row_echelon_F2,
-                     kernel_F2, commutator, check_commutativity)
+                     kernel_F2, commutator, check_commutativity, evolution_instruction_slice, 
+                     evolution_instruction_power)
 
 from .base_operator import LegacyBaseOperator
 from .weighted_pauli_operator import WeightedPauliOperator, Z2Symmetries

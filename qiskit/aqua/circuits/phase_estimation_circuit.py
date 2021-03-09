@@ -22,7 +22,9 @@ from qiskit.aqua import AquaError
 from qiskit.aqua.utils import CircuitFactory
 from qiskit.aqua.operators import (WeightedPauliOperator,   # pylint: disable=unused-import
                                    suzuki_expansion_slice_pauli_list,
-                                   evolution_instruction)
+                                   evolution_instruction,
+                                   evolution_instruction_slice,
+                                   evolution_instruction_power)
 from qiskit.aqua.components.initial_states import InitialState
 from qiskit.quantum_info import Pauli
 
@@ -194,12 +196,26 @@ class PhaseEstimationCircuit:
                     else:
                         raise ValueError(
                             'Unrecognized expansion mode {}.'.format(self._expansion_mode))
+                single_slice = None
                 for i in range(self._num_ancillae):
 
-                    qc_evolutions_inst = evolution_instruction(
-                        slice_pauli_list, -self._evo_time,
-                        self._num_time_slices, controlled=True, power=(2 ** i),
-                        shallow_slicing=self._shallow_circuit_concat)
+                    #qc_evolutions_inst = evolution_instruction(
+                    #    slice_pauli_list, -self._evo_time,
+                    #    self._num_time_slices, controlled=True, power=(2 ** i),
+                    #    shallow_slicing=self._shallow_circuit_concat)
+
+                    if single_slice is None:
+                        single_slice = evolution_instruction_slice(
+                            slice_pauli_list, -self._evo_time,
+                            self._num_time_slices, controlled=True, 
+                            shallow_slicing= self._shallow_circuit_concat)
+
+                    qc_evolutions_inst = evolution_instruction_power(single_slice,
+                                                    self._num_time_slices,
+                                                    controlled=True,
+                                                    power= (2 ** i),
+                                                    shallow_slicing=self._shallow_circuit_concat)
+
                     if self._shallow_circuit_concat:
                         qc_evolutions = QuantumCircuit(q, a)
                         qc_evolutions.append(qc_evolutions_inst, qargs=list(q) + [a[i]])

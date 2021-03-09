@@ -129,6 +129,8 @@ only diagonal Paulis.
 """
 
 from .legacy import (evolution_instruction,
+                     evolution_instruction_power,
+                     evolution_instruction_slice,
                      suzuki_expansion_slice_pauli_list,
                      pauli_measurement,
                      measure_pauli_z, covariance, row_echelon_F2,

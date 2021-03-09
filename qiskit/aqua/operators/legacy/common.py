@@ -383,6 +383,190 @@ def evolution_instruction(pauli_list, evo_time, num_time_slices,
                 qc.barrier(state_registers)
     return qc.to_instruction()
 
+def evolution_instruction_slice(pauli_list, evo_time, num_time_slices,
+                          controlled=False, 
+                          use_basis_gates=True, shallow_slicing=False):
+    """
+    Returns one slice of the evolution
+
+    Args:
+        pauli_list (list([[complex, Pauli]])): The list of pauli terms corresponding
+                                               to a single time slice to be evolved
+        evo_time (Union(complex, float, Parameter, ParameterExpression)): The evolution time
+        num_time_slices (int): The number of time slices for the expansion
+        controlled (bool, optional): Controlled circuit or not
+        use_basis_gates (bool, optional): boolean flag for indicating only using basis
+                                          gates when building circuit.
+        shallow_slicing (bool, optional): boolean flag for indicating using shallow
+                                          qc.data reference repetition for slicing
+
+    Returns:
+        QuantumCircuit: Circuit of one slice of the evolution.
+
+    Raises:
+        ValueError: Unrecognized pauli
+    """
+
+    state_registers = QuantumRegister(pauli_list[0][1].num_qubits)
+    if controlled:
+        inst_name = 'slice'
+        ancillary_registers = QuantumRegister(1)
+        qc_slice = QuantumCircuit(state_registers, ancillary_registers, name=inst_name)
+    else:
+        inst_name = 'slice'
+        qc_slice = QuantumCircuit(state_registers, name=inst_name)
+
+    # for each pauli [IXYZ]+, record the list of qubit pairs needing CX's
+    cnot_qubit_pairs = [None] * len(pauli_list)
+    # for each pauli [IXYZ]+, record the highest index of the nontrivial pauli gate (X,Y, or Z)
+    top_xyz_pauli_indices = [-1] * len(pauli_list)
+
+    for pauli_idx, pauli in enumerate(reversed(pauli_list)):
+        n_qubits = pauli[1].num_qubits
+        # changes bases if necessary
+        nontrivial_pauli_indices = []
+        for qubit_idx in range(n_qubits):
+            # pauli I
+            if not pauli[1].z[qubit_idx] and not pauli[1].x[qubit_idx]:
+                continue
+
+            if cnot_qubit_pairs[pauli_idx] is None:
+                nontrivial_pauli_indices.append(qubit_idx)
+
+            if pauli[1].x[qubit_idx]:
+                # pauli X
+                if not pauli[1].z[qubit_idx]:
+                    if use_basis_gates:
+                        qc_slice.h(state_registers[qubit_idx])
+                    else:
+                        qc_slice.h(state_registers[qubit_idx])
+                # pauli Y
+                elif pauli[1].z[qubit_idx]:
+                    if use_basis_gates:
+                        qc_slice.u(pi / 2, -pi / 2, pi / 2, state_registers[qubit_idx])
+                    else:
+                        qc_slice.rx(pi / 2, state_registers[qubit_idx])
+            # pauli Z
+            elif pauli[1].z[qubit_idx] and not pauli[1].x[qubit_idx]:
+                pass
+            else:
+                raise ValueError('Unrecognized pauli: {}'.format(pauli[1]))
+
+        if nontrivial_pauli_indices:
+            top_xyz_pauli_indices[pauli_idx] = nontrivial_pauli_indices[-1]
+
+        # insert lhs cnot gates
+        if cnot_qubit_pairs[pauli_idx] is None:
+            cnot_qubit_pairs[pauli_idx] = list(zip(
+                sorted(nontrivial_pauli_indices)[:-1],
+                sorted(nontrivial_pauli_indices)[1:]
+            ))
+
+        for pair in cnot_qubit_pairs[pauli_idx]:
+            qc_slice.cx(state_registers[pair[0]], state_registers[pair[1]])
+
+        # insert Rz gate
+        if top_xyz_pauli_indices[pauli_idx] >= 0:
+
+            # Because Parameter does not support complexity number operation; thus, we do
+            # the following tricks to generate parameterized instruction.
+            # We assume the coefficient in the pauli is always real. and can not do imaginary time
+            # evolution
+            if isinstance(evo_time, (Parameter, ParameterExpression)):
+                lam = 2.0 * pauli[0] / num_time_slices
+                lam = lam.real if lam.imag == 0 else lam
+                lam = lam * evo_time
+            else:
+                lam = (2.0 * pauli[0] * evo_time / num_time_slices).real
+
+            if not controlled:
+                if use_basis_gates:
+                    qc_slice.p(lam, state_registers[top_xyz_pauli_indices[pauli_idx]])
+                else:
+                    qc_slice.rz(lam, state_registers[top_xyz_pauli_indices[pauli_idx]])
+            else:
+                if use_basis_gates:
+                    qc_slice.p(lam / 2, state_registers[top_xyz_pauli_indices[pauli_idx]])
+                    qc_slice.cx(ancillary_registers[0],
+                                state_registers[top_xyz_pauli_indices[pauli_idx]])
+                    qc_slice.p(-lam / 2, state_registers[top_xyz_pauli_indices[pauli_idx]])
+                    qc_slice.cx(ancillary_registers[0],
+                                state_registers[top_xyz_pauli_indices[pauli_idx]])
+                else:
+                    qc_slice.crz(lam, ancillary_registers[0],
+                                 state_registers[top_xyz_pauli_indices[pauli_idx]])
+
+        # insert rhs cnot gates
+        for pair in reversed(cnot_qubit_pairs[pauli_idx]):
+            qc_slice.cx(state_registers[pair[0]], state_registers[pair[1]])
+
+        # revert bases if necessary
+        for qubit_idx in range(n_qubits):
+            if pauli[1].x[qubit_idx]:
+                # pauli X
+                if not pauli[1].z[qubit_idx]:
+                    if use_basis_gates:
+                        qc_slice.h(state_registers[qubit_idx])
+                    else:
+                        qc_slice.h(state_registers[qubit_idx])
+                # pauli Y
+                elif pauli[1].z[qubit_idx]:
+                    if use_basis_gates:
+                        qc_slice.u(-pi / 2, -pi / 2, pi / 2, state_registers[qubit_idx])
+                    else:
+                        qc_slice.rx(-pi / 2, state_registers[qubit_idx])
+    # return the slice
+
+    return qc_slice
+
+
+def evolution_instruction_power(qc_slice, num_time_slices,
+                          controlled=False, power=1, 
+                          shallow_slicing=False, barrier = False):
+
+    """
+    Construct the evolution circuit according to the supplied specification.
+
+    Args:
+        qc_slice: One slice of evolution, provided by evolution_instruction_slice
+        num_time_slices (int): The number of time slices for the expansion
+        controlled (bool, optional): Controlled circuit or not
+        power (int, optional): The power to which the unitary operator is to be raised
+        shallow_slicing (bool, optional): boolean flag for indicating using shallow
+                                        qc.data reference repetition for slicing
+        barrier (bool, optional): whether or not add barrier for every slice
+
+    Returns:
+        Instruction: The Instruction corresponding to specified evolution.
+
+    Raises:
+        AquaError: power must be an integer and greater or equal to 1
+    """
+
+    if not isinstance(power, (int, np.int)) or power < 1:
+        raise AquaError("power must be an integer and greater or equal to 1.")
+
+    if controlled:
+        inst_name = 'Controlled-Evolution^{}'.format(power)
+    else:
+        inst_name = 'Evolution^{}'.format(power)
+
+    # repeat the slice
+    if shallow_slicing:
+        logger.info('Under shallow slicing mode, the qc.data reference is repeated shallowly. '
+                    'Thus, changing gates of one slice of the output circuit might affect '
+                    'other slices.')
+        if barrier:
+            qc_slice.barrier()
+        qc_slice.data *= (num_time_slices * power)
+        qc = qc_slice
+    else:
+        qc = QuantumCircuit(name=inst_name)
+        for _ in range(num_time_slices * power):
+            qc += qc_slice
+            if barrier:
+                qc.barrier()
+    return qc.to_instruction()
 
 def commutator(op_a, op_b, op_c=None, sign=False, threshold=1e-12):
     r"""
