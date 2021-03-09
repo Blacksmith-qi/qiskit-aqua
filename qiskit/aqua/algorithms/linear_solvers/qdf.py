@@ -344,7 +344,6 @@ class QDF(HHL):
 
         # Inverse EigenvalueEstimation
         qc += self._eigs2.construct_inverse("circuit", self._eigs2._circuit)
-        
 
         # Measuring the ancilla qubits
         if measurement:
@@ -421,6 +420,7 @@ class QDF(HHL):
         results_noanc = self._tomo_postselect(results)
         tomo_data = StateTomographyFitter(results_noanc, tomo_circuits_noanc)
         rho_fit = tomo_data.fit('cvx')
+        print(rho_fit)
         vec = DensityMatrix(rho_fit).to_statevector(atol=0.1)
         self._hhl_results(vec.data)
 
