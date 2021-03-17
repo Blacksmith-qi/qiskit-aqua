@@ -7,6 +7,7 @@ from copy import Error, deepcopy
 import numpy as np
 from collections import Counter
 from numpy.core.records import array
+import pickle
 
 from qiskit import QuantumRegister, ClassicalRegister, QuantumCircuit
 
@@ -50,10 +51,11 @@ class QDF(HHL):
             rotation: Optional[Reciprocal] = None,
             num_q: int = 0,
             num_a: int = 0,
-            orig_size: Optional[Tuple[int, int]] = None,
+            orig_size: Optional[Tuple[int, int]] = [None,None],
             mprime: Optional[int] = 2,
             quantum_instance: Optional[
-                Union[QuantumInstance, BaseBackend, Backend]] = None) -> None:
+                Union[QuantumInstance, BaseBackend, Backend]] = None,
+            save_name: str = None) -> None:
         """
         Args:
             matrix: The input matrix of linear system of equations
@@ -70,6 +72,7 @@ class QDF(HHL):
             orig_size: Orignal size of the matrix before resizing
             mprime: Reduced numer of fit functions according to paper
             quantum_instance: Quantum Instance or Backend
+            save_name: Suffix for saved files. If None nothing is saved
         Raises:
             ValueError: Invalid input
         """
@@ -92,6 +95,7 @@ class QDF(HHL):
         self._vector_old = None
         self._mprime = mprime
         self._idx_keep_dim = None
+        self._save_name = save_name
  
 
     @staticmethod
@@ -418,6 +422,17 @@ class QDF(HHL):
         # Filtering the tomo data for valid results with ancillary measured
         # to 1, i.e. c1==1 and c2==1
         results_noanc = self._tomo_postselect(results)
+
+        # Saving data to pickle
+        if self._save_name is not None:
+            pickle.dump(tomo_circuits, 
+                        open("tomo_circuits_" + self._save_name +".pkl", 'wb'))
+            pickle.dump(tomo_circuits_noanc,
+                        open("tomo_circuits_noanc_" + self._save_name +".pkl", 'wb'))
+            pickle.dump(results, 
+                        open("results_" + self._save_name +".pkl", 'wb'))
+
+        # Starting fit
         tomo_data = StateTomographyFitter(results_noanc, tomo_circuits_noanc)
         rho_fit = tomo_data.fit('cvx')
         print(rho_fit)
