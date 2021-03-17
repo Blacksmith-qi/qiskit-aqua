@@ -212,7 +212,7 @@ class DirectLookupRotation(LookupRotation):
         if self._negative_evals:
             qc.cry(2 * np.pi, self._ev[0], self._anc[0])
         
-        qc.reset(self._msq)
-        qc.reset(self._workq)
+        qc.barrier(self._msq)
+        qc.barrier(self._workq)
         self._circuit = qc
         return self._circuit
