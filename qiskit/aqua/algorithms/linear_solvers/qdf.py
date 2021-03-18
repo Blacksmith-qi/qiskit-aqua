@@ -434,11 +434,17 @@ class QDF(HHL):
                         open("results_" + self._save_name +".pkl", 'wb'))
 
         # Starting fit
-        tomo_data = StateTomographyFitter(results_noanc, tomo_circuits_noanc)
-        rho_fit = tomo_data.fit('cvx')
-        print(rho_fit)
-        vec = DensityMatrix(rho_fit).to_statevector(atol=0.1)
-        self._hhl_results(vec.data)
+        try:
+            tomo_data = StateTomographyFitter(results_noanc, tomo_circuits_noanc)
+            rho_fit = tomo_data.fit('cvx')
+            print(rho_fit)
+            vec = DensityMatrix(rho_fit).to_statevector(atol=0.1)
+            fit_vec = vec.data
+        except:
+            print("Fitting to measurement failed")
+            print("Setting result to zero")
+            fit_vec = np.zeros(len(self._vector))
+        self._hhl_results(fit_vec)
 
     def _tomo_postselect(self, results: Any) -> Any:
         new_results = deepcopy(results)
@@ -483,11 +489,15 @@ class QDF(HHL):
         def diff(x, output, solution):
             return np.linalg.norm((x[0] + x[1]*1j)*output - solution)
         # Minimize this function
-        res_min = sp.optimize.minimize(diff,
+        if np.array_equal(res_vec, np.zeros(len(res_vec))):
+            solution = res_vec
+        else:
+            res_min = sp.optimize.minimize(diff,
                                     x0=(1,1),
                                     args=(res_vec, result_ref))
 
-        solution = res_vec * (res_min.x[0] + res_min.x[1]*1j)
+            solution = res_vec * (res_min.x[0] + res_min.x[1]*1j)
+
         self._ret["solution"] = solution
         
         # Reconstructing original vector if number of fit functions
