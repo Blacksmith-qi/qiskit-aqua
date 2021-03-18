@@ -5,6 +5,7 @@ from typing import Optional, Union, Dict, Any, Tuple
 import logging
 from copy import Error, deepcopy
 import numpy as np
+import scipy as sp
 from collections import Counter
 from numpy.core.records import array
 import pickle
@@ -474,11 +475,19 @@ class QDF(HHL):
         self._ret["output"] = res_vec
         self._in_vector = in_vec
         # Rescaling the output vector to the real solution vector
-        tmp_vec = matrix.dot(res_vec)
-        f1 = np.linalg.norm(in_vec) / np.linalg.norm(tmp_vec)
-        # "-1+1" to fix angle error for -0.-0.j
-        f2 = sum(np.angle(in_vec * tmp_vec.conj() - 1 + 1)) 
-        solution = f1 * res_vec * np.exp(-1j * f2)
+
+        # Calculating the real solution vector
+        result_ref = np.linalg.pinv(matrix) @ in_vec
+
+        # Difference between output and solution
+        def diff(x, output, solution):
+            return np.linalg.norm((x[0] + x[1]*1j)*output - solution)
+        # Minimize this function
+        res_min = sp.optimize.minimize(diff,
+                                    x0=(1,1),
+                                    args=(res_vec, result_ref))
+
+        solution = res_vec * (res_min.x[0] + res_min.x[1]*1j)
         self._ret["solution"] = solution
         
         # Reconstructing original vector if number of fit functions
