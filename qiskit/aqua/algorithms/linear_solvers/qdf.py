@@ -438,7 +438,7 @@ class QDF(HHL):
             tomo_data = StateTomographyFitter(results_noanc, tomo_circuits_noanc)
             rho_fit = tomo_data.fit('cvx')
             print(rho_fit)
-            vec = DensityMatrix(rho_fit).to_statevector(atol=0.1)
+            vec = DensityMatrix(rho_fit).to_statevector(atol=0.8)
             fit_vec = vec.data
         except:
             print("Fitting to measurement failed")
