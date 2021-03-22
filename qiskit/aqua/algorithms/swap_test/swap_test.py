@@ -104,7 +104,7 @@ class SwapTest(QuantumAlgorithm):
 
         return results
 
-    def get_probaility(self, qdf: Optional[bool] = False) -> float:
+    def get_probability(self, qdf: Optional[bool] = False) -> float:
         if self._results is None:
             self.run()
 
@@ -129,8 +129,10 @@ class SwapTest(QuantumAlgorithm):
                 runs_neg += hits
             else:
                 runs_pos += hits
-
-        prob = runs_pos / (runs_pos + runs_neg)
+        if (runs_neg + runs_pos) != 0:
+            prob = runs_pos / (runs_pos + runs_neg)
+        else:
+            prob = 0.5
         error = 2 * (1 - np.sqrt(abs(1-2 * prob)))
         difference = abs(1-2 * prob)
         result = {'probability' : prob, 'error' : error, 
