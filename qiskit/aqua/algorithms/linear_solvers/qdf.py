@@ -505,23 +505,14 @@ class QDF(HHL):
         if self._idx_keep_dim is not None:
             # Add removed dims
             res_old = []
-            for idx in range(len(self._vector_old)):
+            for idx in range(self._original_dimension):
                 if idx in self._idx_keep_dim:
                     res_old.append(solution[0])
                     solution = np.delete(solution,0)
                 else:
                     res_old.append(0)
 
-            res_vec = np.array(res_old)
-            in_vec = self._vector_old
-        
-            # Rescaling the output vector to the real solution vector
-            tmp_vec = self._matrix_old.dot(res_vec)
-            f1 = np.linalg.norm(in_vec) / np.linalg.norm(tmp_vec)
-            # "-1+1" to fix angle error for -0.-0.j
-            f2 = sum(np.angle(in_vec * tmp_vec.conj() - 1 + 1)) 
-            solution_rec = f1 * res_vec * np.exp(-1j * f2)
-            self._ret["solution_old"] = solution_rec
+            self._ret["solution_old"] = np.array(res_old)
 
 
     @staticmethod
