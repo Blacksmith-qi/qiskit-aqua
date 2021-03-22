@@ -632,7 +632,69 @@ class QDF(HHL):
         self._init_state = Custom(num_q, state_vector=vector)
 
 
-       
+    @staticmethod
+    def create_matrix(dim: int ,
+                    seed: Optional[int] = 0,
+                    kappa: Optional[float] = 4) -> Tuple[np.ndarray, np.ndarray]:
+
+        """
+        Creates an sparse, square, hermitian matrix with given dimension
+        and seed.
+        Checks if diagonal is not all zero
+
+        Args:
+            dim: dimension of the matrix    
+            seed: seed for random generator
+            kappa: max ratio between smallest and biggest eval
+
+        Returns:
+            matrix: random matrix 
+            vector: random vector with same seed
+        """
+
+        # Default density 
+        density = 0.1
+        # Increase density for 4x4 matrixes
+        if dim == 4:
+            density = 0.3
+        elif dim == 16:
+            density == 0.01
+
+        # Set seed
+        np.random.seed(seed)
+
+        # Create cextor
+        vector = np.random.rand(dim)
+
+        # Create matrix
+        Found = False
+        Runs = 0
+        while not Found:
+            # Increase counter 
+            Runs += 1
+            if Runs > 10000:
+                raise RuntimeError('Faild to create random matrix')
+
+            pre_matrix = sp.sparse.random(dim, dim, density=density)
+            pre_matrix = pre_matrix.toarray()
+            # Make it hermitan
+            matrix = 0.5 * (pre_matrix + pre_matrix.conj().T)
+            # Check diag not zero
+            for i in range(dim):
+                matrix[i,i] += vector[i]/2
+            eigvalues = np.linalg.eigvals(matrix)
+
+            # neg evals
+            if not 0 in abs(eigvalues):
+                if max(abs(eigvalues)) / min(abs(eigvalues)) <= kappa:
+                    matrix = matrix / max(abs(eigvalues)) * 2
+                    # Fix spectrum
+                    if not np.array_equal(np.diag(matrix),np.zeros(dim)):
+                        Found = True
+
+        return matrix, vector
+
+
 
             
 
