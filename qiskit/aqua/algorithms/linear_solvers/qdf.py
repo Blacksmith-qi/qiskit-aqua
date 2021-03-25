@@ -586,6 +586,7 @@ class QDF(HHL):
             dim = int(key,2)
             if dim < self._orig_columns:
                 idx_keep_dim.append(dim)
+        idx_keep_dim.sort()
         
         self._idx_keep_dim = idx_keep_dim
 
