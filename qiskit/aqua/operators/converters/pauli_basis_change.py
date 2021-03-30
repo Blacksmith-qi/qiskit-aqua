@@ -1,6 +1,6 @@
 # This code is part of Qiskit.
 #
-# (C) Copyright IBM 2020.
+# (C) Copyright IBM 2020, 2021.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -24,7 +24,6 @@ from ..operator_base import OperatorBase
 from ..primitive_ops.primitive_op import PrimitiveOp
 from ..primitive_ops.pauli_op import PauliOp
 from ..primitive_ops.circuit_op import CircuitOp
-from ..primitive_ops.pauli_sum_op import PauliSumOp
 from ..list_ops.list_op import ListOp
 from ..list_ops.composed_op import ComposedOp
 from ..state_fns.state_fn import StateFn
@@ -131,9 +130,6 @@ class PauliBasisChange(ConverterBase):
             The converted Operator.
 
         """
-        # TODO: implement direct way
-        if isinstance(operator, PauliSumOp):
-            operator = operator.to_pauli_op()
 
         if isinstance(operator, (Pauli, PrimitiveOp)):
             cob_instr_op, dest_pauli_op = self.get_cob_circuit(operator)
@@ -246,7 +242,7 @@ class PauliBasisChange(ConverterBase):
             reduce(np.logical_or, [p_op.primitive.z for p_op in list_op.oplist])  # type: ignore
         origin_x = \
             reduce(np.logical_or, [p_op.primitive.x for p_op in list_op.oplist])  # type: ignore
-        return Pauli(x=origin_x, z=origin_z)
+        return Pauli((origin_z, origin_x))
 
     def get_diagonal_pauli_op(self, pauli_op: PauliOp) -> PauliOp:
         """ Get the diagonal ``PualiOp`` to which ``pauli_op`` could be rotated with only
@@ -259,8 +255,8 @@ class PauliBasisChange(ConverterBase):
             The diagonal ``PauliOp``.
         """
         return PauliOp(
-            Pauli(z=np.logical_or(pauli_op.primitive.z, pauli_op.primitive.x),  # type: ignore
-                  x=[False] * pauli_op.num_qubits), coeff=pauli_op.coeff)
+            Pauli((np.logical_or(pauli_op.primitive.z, pauli_op.primitive.x),  # type: ignore
+                   [False] * pauli_op.num_qubits)), coeff=pauli_op.coeff)
 
     def get_diagonalizing_clifford(self, pauli: Union[Pauli, PauliOp]) -> OperatorBase:
         r"""
@@ -315,12 +311,12 @@ class PauliBasisChange(ConverterBase):
         # Padding to the end of the Pauli, but remember that Paulis are in reverse endianness.
         if not len(pauli_1.z) == num_qubits:  # type: ignore
             missing_qubits = num_qubits - len(pauli_1.z)  # type: ignore
-            pauli_1 = Pauli(z=([False] * missing_qubits) + pauli_1.z.tolist(),  # type: ignore
-                            x=([False] * missing_qubits) + pauli_1.x.tolist())  # type: ignore
+            pauli_1 = Pauli((([False] * missing_qubits) + pauli_1.z.tolist(),  # type: ignore
+                            ([False] * missing_qubits) + pauli_1.x.tolist()))  # type: ignore
         if not len(pauli_2.z) == num_qubits:  # type: ignore
             missing_qubits = num_qubits - len(pauli_2.z)  # type: ignore
-            pauli_2 = Pauli(z=([False] * missing_qubits) + pauli_2.z.tolist(),  # type: ignore
-                            x=([False] * missing_qubits) + pauli_2.x.tolist())  # type: ignore
+            pauli_2 = Pauli((([False] * missing_qubits) + pauli_2.z.tolist(),  # type: ignore
+                            ([False] * missing_qubits) + pauli_2.x.tolist()))  # type: ignore
 
         return PauliOp(pauli_1, coeff=pauli_op1.coeff), PauliOp(pauli_2, coeff=pauli_op2.coeff)
 

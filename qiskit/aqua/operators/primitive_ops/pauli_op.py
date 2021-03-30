@@ -1,6 +1,6 @@
 # This code is part of Qiskit.
 #
-# (C) Copyright IBM 2020.
+# (C) Copyright IBM 2020, 2021.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -19,12 +19,11 @@ from scipy.sparse import spmatrix
 
 from qiskit import QuantumCircuit
 from qiskit.circuit import ParameterExpression, Instruction
-from qiskit.quantum_info import Pauli, SparsePauliOp
+from qiskit.quantum_info import Pauli
 from qiskit.circuit.library import RZGate, RYGate, RXGate, XGate, YGate, ZGate, IGate
 
 from ..operator_base import OperatorBase
 from .primitive_op import PrimitiveOp
-from .pauli_sum_op import PauliSumOp
 from ..list_ops.summed_op import SummedOp
 from ..list_ops.tensored_op import TensoredOp
 from ..legacy.weighted_pauli_operator import WeightedPauliOperator
@@ -71,23 +70,10 @@ class PauliOp(PrimitiveOp):
         if isinstance(other, PauliOp) and self.primitive == other.primitive:
             return PauliOp(self.primitive, coeff=self.coeff + other.coeff)
 
-        if (
-                isinstance(other, PauliOp)
-                and isinstance(self.coeff, (int, float, complex))
-                and isinstance(other.coeff, (int, float, complex))
-        ):
-            return PauliSumOp(
-                SparsePauliOp(self.primitive, coeffs=[self.coeff])
-                + SparsePauliOp(other.primitive, coeffs=[other.coeff])
-            )
-
-        if isinstance(other, PauliSumOp) and isinstance(self.coeff, (int, float, complex)):
-            return PauliSumOp(SparsePauliOp(self.primitive, coeffs=[self.coeff])) + other
-
         return SummedOp([self, other])
 
     def adjoint(self) -> OperatorBase:
-        return PauliOp(self.primitive, coeff=self.coeff.conjugate())
+        return PauliOp(self.primitive, coeff=np.conj(self.coeff))
 
     def equals(self, other: OperatorBase) -> bool:
         if not isinstance(other, PauliOp) or not self.coeff == other.coeff:
@@ -102,9 +88,9 @@ class PauliOp(PrimitiveOp):
         # Both Paulis
         if isinstance(other, PauliOp):
             # Copying here because Terra's Pauli kron is in-place.
-            op_copy = Pauli(x=other.primitive.x, z=other.primitive.z)  # type: ignore
+            op_copy = Pauli((other.primitive.z, other.primitive.x))  # type: ignore
             # NOTE!!! REVERSING QISKIT ENDIANNESS HERE
-            return PauliOp(op_copy.kron(self.primitive), coeff=self.coeff * other.coeff)
+            return PauliOp(op_copy.expand(self.primitive), coeff=self.coeff * other.coeff)
 
         # pylint: disable=cyclic-import,import-outside-toplevel
         from .circuit_op import CircuitOp
@@ -150,7 +136,8 @@ class PauliOp(PrimitiveOp):
 
         # Both Paulis
         if isinstance(other, PauliOp):
-            product, phase = Pauli.sgn_prod(new_self.primitive, other.primitive)
+            p_a = new_self.primitive.dot(other.primitive)  # type: ignore
+            product, phase = p_a[:], (-1j) ** p_a.phase  # type: ignore
             return PrimitiveOp(product, coeff=new_self.coeff * other.coeff * phase)
 
         # pylint: disable=cyclic-import,import-outside-toplevel
@@ -174,7 +161,7 @@ class PauliOp(PrimitiveOp):
         Raises:
             ValueError: invalid parameters.
         """
-        return self.primitive.to_spmatrix() * self.coeff  # type: ignore
+        return self.primitive.to_matrix(sparse=True) * self.coeff  # type: ignore
 
     def __str__(self) -> str:
         prim_str = str(self.primitive)
@@ -221,7 +208,7 @@ class PauliOp(PrimitiveOp):
                 corrected_z_bits = self.primitive.z[::-1]  # type: ignore
 
                 for bstr, v in front.primitive.items():
-                    bitstr = np.asarray(list(bstr)).astype(np.int).astype(np.bool)
+                    bitstr = np.asarray(list(bstr)).astype(int).astype(bool)
                     new_b_str = np.logical_xor(bitstr, corrected_x_bits)
                     new_str = ''.join(map(str, 1 * new_b_str))
                     z_factor = np.product(1 - 2 * np.logical_and(bitstr, corrected_z_bits))
