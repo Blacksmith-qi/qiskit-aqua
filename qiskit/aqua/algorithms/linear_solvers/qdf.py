@@ -628,7 +628,8 @@ class QDF(HHL):
     @staticmethod
     def create_matrix(dim: int ,
                     seed: Optional[int] = 0,
-                    kappa: Optional[float] = 4) -> Tuple[np.ndarray, np.ndarray]:
+                    kappa: Optional[float] = 4,
+                    kappa_min: Optional[float] = 0) -> Tuple[np.ndarray, np.ndarray]:
 
         """
         Creates an sparse, square, hermitian matrix with given dimension
@@ -639,6 +640,7 @@ class QDF(HHL):
             dim: dimension of the matrix    
             seed: seed for random generator
             kappa: max ratio between smallest and biggest eval
+            kappa_min: minimal ratio between smallest and biggest eval. Default kappa-1
 
         Returns:
             matrix: random matrix 
@@ -652,6 +654,7 @@ class QDF(HHL):
             density = 0.3
         elif dim == 16:
             density == 0.01
+        kappa_min = kappa - 1
 
         # Set seed
         np.random.seed(seed)
@@ -675,11 +678,12 @@ class QDF(HHL):
             # Check diag not zero
             for i in range(dim):
                 matrix[i,i] += vector[i]/2
-            eigvalues = np.linalg.eigvals(matrix)
+            eigvalues = np.round(np.linalg.eigvals(matrix),5)
 
             # neg evals
             if not 0 in abs(eigvalues):
-                if max(abs(eigvalues)) / min(abs(eigvalues)) <= kappa:
+                if max(abs(eigvalues)) / min(abs(eigvalues)) <= kappa and \
+                    max(abs(eigvalues)) / min(abs(eigvalues)) >= kappa_min :
                     matrix = matrix / max(abs(eigvalues)) * 2
                     # Fix spectrum
                     if not np.array_equal(np.diag(matrix),np.zeros(dim)):
