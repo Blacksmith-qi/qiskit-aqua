@@ -5,6 +5,7 @@ from typing import Optional, Union, Dict, Any, Tuple
 import logging
 from copy import Error, deepcopy
 import numpy as np
+from numpy import random
 import scipy as sp
 from collections import Counter
 from numpy.core.records import array
@@ -689,4 +690,73 @@ class QDF(HHL):
 
 
             
+
+    @staticmethod
+    def create_pauli_matrix(qubits: int ,
+                            number: Optional[int] = 1,
+                            kappa: Optional[int] = 4 ,
+                            seed: Optional[int] = 0 )-> Tuple[np.ndarray, np.ndarray]:
+
+        """
+        Creates matrix and vector as a sum of Pauli-Product states.
+
+        Args:
+            qubits: Number of qubits to act on. Matrix will have dim 2**qubits
+            number: number of summands
+            kappa: maximal ratio between smalles and biggest eval
+            seed: seed for random generator of vector
+
+        Returns:
+            matrix: random matrix 
+            vector: random vector with same seed
+        """
+        # Calulcat dim
+        dim = 2 ** qubits
+
+         # Set seed
+        np.random.seed(seed)
+
+        # Create cextor
+        vector = np.random.rand(dim)
+
+        # Define sigma matrices
+        sigma_x = np.array([[0, 1],[1, 0]])
+        sigma_y = np.array([[0, -1j],[1j, 0]])
+        sigma_z = np.array([[1, 0],[0, -1]])
+        sigma_0 = np.identity(2)
+        sigmas = [sigma_0, sigma_x, sigma_y, sigma_z]
+      
+        # Create matrix
+        Found = False
+        Runs = 0
+        while not Found:
+            matrix = np.zeros((dim,dim),dtype='complex128')
+            for i in range(number):
+                # Create random order of Pauli matrices
+                Paulis = []
+                for idx_list in range(qubits):
+                    Paulis.append(random.randint(0,4))
+                # Add Pauli matrix to final matrix
+                factor = np.random.rand()/ number
+                # Calculate matrix to add
+                add_matrix = 1
+                for pauli in Paulis:
+                    add_matrix = np.kron(add_matrix,sigmas[pauli])
+                matrix += factor * add_matrix
+
+            eigvalues = np.round(np.linalg.eigvals(matrix),7)
+            # neg evals
+            if not 0 in abs(eigvalues):
+                if max(abs(eigvalues)) / min(abs(eigvalues)) <= kappa:
+                    matrix = matrix / max(abs(eigvalues)) * 2
+                    # Fix spectrum
+                    if not np.array_equal(np.diag(matrix),np.zeros(dim)):
+                        Found = True
+
+
+
+        return matrix, vector
+                
+
+
 
