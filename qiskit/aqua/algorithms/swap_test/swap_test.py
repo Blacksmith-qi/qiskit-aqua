@@ -139,11 +139,13 @@ class SwapTest(QuantumAlgorithm):
             # Probability to successful rotation
             prob_measure = successful_runs / num_of_runs
             # Probability of successful measurement
-            prob = runs_pos / (runs_pos + runs_neg) / np.sqrt(prob_measure)
+            prob_pure = runs_pos / (runs_pos + runs_neg)
+            prob =  prob_pure / prob_measure
         else:
             prob = 0.5
         error = 2 * (1 - np.sqrt(abs(1-2 * prob)))
         difference = abs(1-2 * prob)
         result = {'probability' : prob, 'error' : error, 
-                    'scalar_product' : difference}
+                    'scalar_product' : difference,
+                    'prob_pure': prob_pure }
         return result
