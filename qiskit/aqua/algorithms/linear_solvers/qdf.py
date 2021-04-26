@@ -500,6 +500,13 @@ class QDF(HHL):
             solution = res_vec * (res_min.x[0] + res_min.x[1]*1j)
 
         self._ret["solution"] = solution
+
+        # Calculate error of fit according to paper
+
+        y = in_vec / np.linalg.norm(in_vec)
+        z = matrix @ res_vec / np.linalg.norm(matrix @ res_vec)
+        error = 2 * (1 - abs(np.dot(z,y)))
+        self._ret["error"] = error
         
         # Reconstructing original vector if number of fit functions
         # have been reduced
