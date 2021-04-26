@@ -142,6 +142,5 @@ class SwapTest(QuantumAlgorithm):
         error = 2 * (1 - np.sqrt(abs(1-2 * prob)))
         difference = abs(1-2 * prob)
         result = {'probability' : prob, 'error' : error, 
-                    'scalar_product' : difference,
-                    'prob_pure': prob_pure }
+                    'scalar_product' : difference}
         return result
