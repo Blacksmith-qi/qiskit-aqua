@@ -138,8 +138,10 @@ class SwapTest(QuantumAlgorithm):
             prob = runs_pos / (runs_pos + runs_neg)
         else:
             prob = 0.5
+            prob_pure = 0.5
         error = 2 * (1 - np.sqrt(abs(1-2 * prob)))
         difference = abs(1-2 * prob)
         result = {'probability' : prob, 'error' : error, 
-                    'scalar_product' : difference}
+                    'scalar_product' : difference,
+                    'prob_pure': prob_pure }
         return result
