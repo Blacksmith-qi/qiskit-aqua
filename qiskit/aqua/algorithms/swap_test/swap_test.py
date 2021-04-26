@@ -109,13 +109,11 @@ class SwapTest(QuantumAlgorithm):
             self.run()
 
         counts = self._results.get_counts()
-        num_of_runs = sum(counts.values())
 
         # Postselect counts with ancillae in 11
         if qdf == True:
             counts = algorithms.linear_solvers.QDF._filter_results(counts)
 
-        successful_runs = sum(counts.values())
 
         # Starting post processing
         runs_pos = 0
@@ -136,10 +134,8 @@ class SwapTest(QuantumAlgorithm):
             else:
                 runs_pos += hits
         if (runs_neg + runs_pos) != 0:
-            # Probability to successful rotation
-            prob_measure = successful_runs / num_of_runs
             # Probability of successful measurement
-            prob = runs_pos / (runs_pos + runs_neg) / np.sqrt(prob_measure)
+            prob = runs_pos / (runs_pos + runs_neg)
         else:
             prob = 0.5
         error = 2 * (1 - np.sqrt(abs(1-2 * prob)))
