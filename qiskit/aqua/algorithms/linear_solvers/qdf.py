@@ -519,6 +519,8 @@ class QDF(HHL):
                     res_vec = np.delete(res_vec,0)
                 else:
                     res_old.append(0)
+            
+            res_old = np.array(res_old)
 
             # Repeat minmization
             if np.array_equal(res_old, np.zeros(len(res_old))):
