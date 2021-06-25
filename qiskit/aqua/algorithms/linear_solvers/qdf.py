@@ -499,7 +499,7 @@ class QDF(HHL):
 
             solution = res_vec * (res_min.x[0] + res_min.x[1]*1j)
 
-        self._ret["solution"] = solution
+        self._ret["solution"] = solution.copy()
 
         # Calculate error of fit according to paper
 
@@ -515,12 +515,24 @@ class QDF(HHL):
             res_old = []
             for idx in range(self._original_dimension):
                 if idx in self._idx_keep_dim:
-                    res_old.append(solution[0])
-                    solution = np.delete(solution,0)
+                    res_old.append(res_vec[0])
+                    res_vec = np.delete(res_vec,0)
                 else:
                     res_old.append(0)
 
-            self._ret["solution_old"] = np.array(res_old)
+            # Repeat minmization
+            if np.array_equal(res_old, np.zeros(len(res_old))):
+                solution_new = res_vec
+            else:
+                res_min = sp.optimize.minimize(diff,
+                                        x0=(1,1),
+                                        args=(res_old, result_ref))
+
+                solution_new = res_old * (res_min.x[0] + res_min.x[1]*1j)
+
+
+
+            self._ret["solution_new"] = np.array(solution_new)
 
 
     @staticmethod
