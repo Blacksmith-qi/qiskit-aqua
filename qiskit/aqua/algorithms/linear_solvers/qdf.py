@@ -519,19 +519,25 @@ class QDF(HHL):
         if self._idx_keep_dim is not None:
             # Add removed dims
             res_old = []
+            ref_old = []
             for idx in range(self._original_dimension):
                 if idx in self._idx_keep_dim:
                     res_old.append(res_vec[0])
+                    ref_old.append(result_ref[0])
                     res_vec = np.delete(res_vec,0)
+                    ref_vec = np.delete(result_ref,0)
                 else:
                     res_old.append(0)
+                    ref_old.append(0)
             
             res_old = np.array(res_old)
+            ref_old = np.array(ref_old)
 
             #DEBUG2
             print('Debug 2')
             print(res_vec)
             print(res_old)
+            print(ref_old)
             print(result_ref)
 
             # Repeat minmization
@@ -540,11 +546,14 @@ class QDF(HHL):
             else:
                 res_min = sp.optimize.minimize(diff,
                                         x0=(1,1),
-                                        args=(res_old, result_ref))
+                                        args=(res_old, ref_old))
 
                 solution_new = res_old * (res_min.x[0] + res_min.x[1]*1j)
 
 
+            print('DEBUG 3')
+            print(solution_new)
+            print(ref_old)
 
             self._ret["solution_new"] = np.array(solution_new)
 
