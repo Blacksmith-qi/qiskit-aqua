@@ -483,6 +483,12 @@ class QDF(HHL):
         self._in_vector = in_vec
         # Rescaling the output vector to the real solution vector
 
+        #DEBUG
+        print(res_vec)
+        print(in_vec)
+        print(matrix)
+        print(vec)
+
         # Calculating the real solution vector
         result_ref = np.linalg.pinv(matrix) @ in_vec
 
@@ -521,6 +527,12 @@ class QDF(HHL):
                     res_old.append(0)
             
             res_old = np.array(res_old)
+
+            #DEBUG2
+            print('Debug 2')
+            print(res_vec)
+            print(res_old)
+            print(result_ref)
 
             # Repeat minmization
             if np.array_equal(res_old, np.zeros(len(res_old))):
