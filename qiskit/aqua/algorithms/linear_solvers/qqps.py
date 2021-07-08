@@ -185,17 +185,11 @@ class QQPS(HHL):
         res = self._quantum_instance.execute(self._circuit)
         sv = np.asarray(res.get_statevector(self._circuit))
 
-        print('DEBUG Info')
-        print(self._ancilla_index)
-        print(self._circuit)
-        print(sv)
 
         # Extract solution vector from statevector
         vec = self._reciprocal.sv_to_resvec(sv, self._num_q, 
                                     self._ancilla_index, True)
 
-        print(vec)
-        print(len(vec))
         # remove added dimensions
         self._ret['probability_result'] = \
             np.real(self._resize_vector(vec).dot(self._resize_vector(vec).conj()))
@@ -220,7 +214,7 @@ class QQPS(HHL):
 
         # cost functino of problem
         def costfn(x):
-            return 0.5 * x @ matrix @ x + res_vec.T @ x 
+            return 0.5 * x @ matrix @ x + in_vec.T @ x 
 
         # Calculating the real solution vector
         result_ref_all = sp.optimize.minimize(costfn, x0=np.ones(self._orig_columns))

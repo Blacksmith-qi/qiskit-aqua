@@ -177,7 +177,7 @@ class SqrtRotation(LookupRotation):
                 for subpattern, lambda_ in zip(subpat, lambda_ar):
 
                     # calculate rotation angle
-                    theta = 2 * np.arcsin(min(1, 2 * self._scale * np.sqrt(lambda_)))
+                    theta = 2 * np.arcsin(min(1, 2 * self._scale / np.sqrt(lambda_)))
                     # offset for ncx gate checking subpattern
                     offset = fo + 1 if fo < k - n else fo
 
