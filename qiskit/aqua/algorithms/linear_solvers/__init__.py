@@ -16,11 +16,13 @@ from .linear_solver_result import LinearsolverResult
 from .hhl import HHL, HHLResult
 from .numpy_ls_solver import NumPyLSsolver, NumPyLSsolverResult, ExactLSsolver
 from .qdf import QDF
+from .qqps import QQPS
 
 __all__ = ['LinearsolverResult',
            'HHL',
            'HHLResult',
            'QDF',
+           'QQPS',
            'NumPyLSsolver',
            'NumPyLSsolverResult',
            'ExactLSsolver']
