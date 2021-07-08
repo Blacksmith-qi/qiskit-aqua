@@ -45,5 +45,6 @@ from .lookup_rotation import LookupRotation
 from .long_division import LongDivision
 from .direct_rotation import DirectRotation
 from .direct_lookup_rotation import DirectLookupRotation
+from .sqrt_rot import SqrtRotation
 
-__all__ = ['LookupRotation', 'LongDivision', 'Reciprocal', 'DirectRotation', DirectLookupRotation]
+__all__ = ['LookupRotation', 'LongDivision', 'Reciprocal', 'DirectRotation', DirectLookupRotation, SqrtRotation]
