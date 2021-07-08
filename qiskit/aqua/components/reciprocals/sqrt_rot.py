@@ -81,16 +81,12 @@ class SqrtRotation(LookupRotation):
                             evo_time=evo_time,
                             lambda_min=lambda_min)
     
-    def sv_to_resvec(self, statevector, num_q, index_ancilla, qdf=False):
+
+
+    def sv_to_resvec(self, statevector, num_q):
         half = int(len(statevector) / 2)
-        print(half)
-        if not qdf:
-            # Ignore ancilla qubit
-            start_idx = half 
-        else:
-            # Ignore 2 ancilla qubits
-            start_idx = half + int(half/2) 
-        return statevector[start_idx:start_idx + 2 ** num_q]
+        vec = statevector[half:half + 2 ** num_q]
+        return vec 
 
     def construct_circuit(self, mode, inreg):  # pylint: disable=arguments-differ
         """Construct the Lookup Rotation circuit.
@@ -115,7 +111,7 @@ class SqrtRotation(LookupRotation):
         self._ev = inreg
         self._workq = QuantumRegister(1, 'work')
         self._msq = QuantumRegister(1, 'msq')
-        self._anc = QuantumRegister(1, 'anc_direct')
+        self._anc = QuantumRegister(1, 'anc')
         qc = QuantumCircuit(self._ev, self._workq, self._msq, self._anc)
         self._circuit = qc
         self._reg_size = len(inreg)
