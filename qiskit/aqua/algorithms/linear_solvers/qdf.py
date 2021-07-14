@@ -582,6 +582,7 @@ class QDF(HHL):
 
     def reduce_fitfunctions(self, num_fit_func: Optional[int] = None, 
                             factor: Optional[float] = 2,
+                            use_columns : Optional[list] = None,
                             new_evo_time: Optional[Tuple[float, float]] =
                                 [None, None]) -> None:
         """
@@ -594,6 +595,7 @@ class QDF(HHL):
             num_fit_func: Number M' of the most important fit functions
             factor: Factor by which num_fit_func is multiplied to get 
                     number of runs
+            use_columns: Predefined columns to reduce withou sampling
         
         Returns:
             nothing but modifys used matrix
@@ -603,34 +605,43 @@ class QDF(HHL):
             # Use mprime from functino init
             num_fit_func = self._mprime
     
+        if use_columns is None:
 
-        if self._quantum_instance.is_statevector:
-            raise Error("Quantum instance needs to be a real device or qasm simulator")
-        else:
-            self.construct_circuit(measurement=True, measure_result=True)
+            if self._quantum_instance.is_statevector:
+                raise Error("Quantum instance needs to be a real device or qasm simulator")
+            else:
+                self.construct_circuit(measurement=True, measure_result=True)
 
 
-        number_of_runs = num_fit_func * factor
+            number_of_runs = num_fit_func * factor
 
-        self._quantum_instance._run_config.shots = number_of_runs 
-        result = self._quantum_instance.execute(self._circuit)
+            self._quantum_instance._run_config.shots = number_of_runs 
+            result = self._quantum_instance.execute(self._circuit)
 
-        counts = result.get_counts(self._circuit)
-        counts = QDF._filter_results(counts)
+            counts = result.get_counts(self._circuit)
+            #DEBUG
+            print('Counts before filter:')
+            print(counts)
+            counts = QDF._filter_results(counts)
+            print('Counts after filter:')
+            print(counts)
 
-        # Selecting most important fit functions
-        idx_keep_dim = []
-        for idx in range(num_fit_func):
-            # Get highes count key
-            key = max(counts, key = counts.get)
-            del counts[key]
-            # Only keep dim if it is not a additional dim from
-            # truncation
-            dim = int(key,2)
-            if dim < self._orig_columns:
-                idx_keep_dim.append(dim)
-        idx_keep_dim.sort()
+            # Selecting most important fit functions
+            idx_keep_dim = []
+            for idx in range(num_fit_func):
+                # Get highes count key
+                key = max(counts, key = counts.get)
+                del counts[key]
+                # Only keep dim if it is not a additional dim from
+                # truncation
+                dim = int(key,2)
+                if dim < self._orig_columns:
+                    idx_keep_dim.append(dim)
+            idx_keep_dim.sort()
         
+        else:
+            idx_keep_dim = use_columns
+
         self._idx_keep_dim = idx_keep_dim
 
 
