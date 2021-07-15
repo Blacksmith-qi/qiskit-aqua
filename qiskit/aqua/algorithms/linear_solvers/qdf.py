@@ -645,16 +645,18 @@ class QDF(HHL):
         self._idx_keep_dim = idx_keep_dim
 
 
-        self._matrix_old = self._matrix
-        self._vector_old = self._vector
+        self._matrix_old = self._matrix.copy()
+        self._vector_old = self._vector.copy()
+        print('old matrix', self._matrix_old)
 
         # Resize the matrix
         new_matrix = self._resize_matrix(self._matrix)
         new_vector = self._resize_in_vector(self._vector)
-
+        print('old matrix resized back', new_matrix)
 
         new_matrix = new_matrix[:,idx_keep_dim]
         self._keep_dim = idx_keep_dim
+        print('new matrix resized back reduced', new_matrix)
 
         self._matrix_new = new_matrix
         self._vector_new = new_vector
@@ -665,7 +667,8 @@ class QDF(HHL):
                 QDF.preparation(new_matrix,
                                 new_vector,
                                 self._num_a)
-
+        print('new matrix used', matrix)
+        
         self._matrix = matrix
         self._vector = vector
         self._truncate_hermitian = truncate_hermitian
